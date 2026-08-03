@@ -1,0 +1,60 @@
+{
+  "name": "tender",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:auth": "vitest run tests/unit/demo-auth.test.ts",
+    "test:db": "supabase test db",
+    "test:parity": "node --experimental-strip-types scripts/verify-calculation-parity.ts",
+    "test:concurrency": "node --env-file=.env.local --experimental-strip-types scripts/verify-quote-concurrency.ts",
+    "test:decisions": "node --env-file=.env.local --experimental-strip-types scripts/verify-decision-concurrency.ts",
+    "test:secrets": "node scripts/verify-secrets.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "verify": "node scripts/verify.mjs",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > lib/supabase/database.types.ts && prettier --write lib/supabase/database.types.ts",
+    "env:local": "node scripts/setup-local-env.mjs",
+    "demo:data": "node scripts/seed-cloud-demo.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.8",
+    "next": "^16.2.11",
+    "papaparse": "^5.5.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9.39.3",
+    "eslint-config-next": "^16.2.11",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.6",
+    "supabase": "^2.109.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}
