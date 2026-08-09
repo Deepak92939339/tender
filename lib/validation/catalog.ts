@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isSupportedCurrency } from "@/lib/formatting/currency";
+import { parseDecimalMinor } from "@/lib/formatting/money";
 
 export const unitCodes = ["EA", "M", "KG", "L", "BOX"] as const;
 
@@ -12,7 +13,7 @@ export const productSchema = z
     unitPrice: z
       .string()
       .trim()
-      .regex(/^\d{1,13}(?:\.\d{1,2})?$/),
+      .regex(/^\d{1,15}(?:\.\d{1,3})?$/),
     currencyCode: z
       .string()
       .trim()
@@ -22,6 +23,16 @@ export const productSchema = z
     active: z.enum(["true", "false"]).default("true"),
   })
   .superRefine((value, context) => {
+    const parsedPrice = isSupportedCurrency(value.currencyCode)
+      ? parseDecimalMinor(value.unitPrice, value.currencyCode)
+      : null;
+    if (parsedPrice === null) {
+      context.addIssue({
+        code: "custom",
+        path: ["unitPrice"],
+        message: "Unit price does not match the currency precision.",
+      });
+    }
     if (
       (value.unitCode === "EA" || value.unitCode === "BOX") &&
       value.quantityPrecision !== 0

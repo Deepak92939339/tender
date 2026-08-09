@@ -18,7 +18,11 @@ import {
 } from "@/lib/quotes/calculate";
 import { quoteStateLabel, type QuoteState } from "@/lib/quotes/effective-state";
 import { SUPPORTED_CURRENCY_CODES } from "@/lib/formatting/currency";
-import { formatMinor, parseDecimalMinor } from "@/lib/formatting/money";
+import {
+  formatMinor,
+  formatMinorDecimal,
+  parseDecimalMinor,
+} from "@/lib/formatting/money";
 
 type Customer = { id: string; name: string; taxTreatment: TaxTreatment };
 type Product = {
@@ -196,7 +200,7 @@ export function QuoteBuilder({
       chargeId: charge.id,
       chargeType: charge.chargeType,
       description: charge.description,
-      amount: (charge.amountMinor / 100).toFixed(2),
+      amount: formatMinorDecimal(charge.amountMinor, quote.currencyCode),
       taxProfileId: charge.taxProfileId,
       taxCode: charge.taxCode,
       taxBps: charge.taxBps,
@@ -266,7 +270,7 @@ export function QuoteBuilder({
       });
       const preparedCharges = charges.map((charge, index) => {
         const tax = taxById.get(charge.taxProfileId);
-        const amountMinor = parseDecimalMinor(charge.amount);
+        const amountMinor = parseDecimalMinor(charge.amount, currencyCode);
         if (!tax || amountMinor === null || !charge.description.trim())
           throw new Error(
             `Charge ${index + 1} needs a description, valid amount and tax profile.`,
@@ -418,7 +422,10 @@ export function QuoteBuilder({
           chargeId: charge.id,
           chargeType: charge.charge_type,
           description: charge.description_snapshot,
-          amount: (charge.amount_minor / 100).toFixed(2),
+          amount: formatMinorDecimal(
+            charge.amount_minor,
+            projection.currency_code,
+          ),
           taxProfileId:
             taxProfiles.find((tax) => tax.code === charge.tax_code_snapshot)
               ?.id ??
@@ -663,7 +670,7 @@ export function QuoteBuilder({
         chargeId: null,
         chargeType: "freight",
         description: "Freight",
-        amount: "0.00",
+        amount: formatMinorDecimal(0, currencyCode),
         taxProfileId: tax.id,
         taxCode: tax.code,
         taxBps: tax.rateBps,

@@ -3,10 +3,10 @@ import { expect, test } from "@playwright/test";
 test("landing loads", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Prepare the offer",
+    "Priced once. Approved on the record. Issued unchanged.",
   );
   await expect(
-    page.getByRole("article", { name: "Quotation awaiting approval" }),
+    page.getByRole("heading", { name: "Build a sample quote" }),
   ).toBeVisible();
 });
 

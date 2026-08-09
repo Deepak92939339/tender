@@ -42,7 +42,7 @@ export async function createProduct(
   const parsed = productSchema.safeParse(Object.fromEntries(formData));
   const commandId = z.string().uuid().safeParse(formData.get("commandId"));
   const unitPriceMinor = parsed.success
-    ? parseDecimalMinor(parsed.data.unitPrice)
+    ? parseDecimalMinor(parsed.data.unitPrice, parsed.data.currencyCode)
     : null;
   if (!parsed.success || !commandId.success || unitPriceMinor === null)
     return {

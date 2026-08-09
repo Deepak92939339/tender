@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  currencyMinorUnitExponent,
   normalizeSupportedCurrency,
   SUPPORTED_CURRENCY_CODES,
 } from "@/lib/formatting/currency";
-import { formatMinor } from "@/lib/formatting/money";
+import { formatMinor, parseDecimalMinor } from "@/lib/formatting/money";
 import {
   calculateQuote,
   type QuoteCalculationInput,
@@ -47,7 +48,7 @@ const customer = {
   taxIdentifier: "",
 };
 
-describe("supported two-decimal currency model", () => {
+describe("supported currency minor-unit model", () => {
   it("defines the complete implemented allowlist", () => {
     expect(SUPPORTED_CURRENCY_CODES).toEqual([
       "INR",
@@ -55,6 +56,9 @@ describe("supported two-decimal currency model", () => {
       "EUR",
       "GBP",
       "RUB",
+      "CAD",
+      "KWD",
+      "JPY",
     ]);
   });
 
@@ -67,7 +71,7 @@ describe("supported two-decimal currency model", () => {
     },
   );
 
-  it.each(["JPY", "KWD"])(
+  it.each(["AUD", "CHF"])(
     "rejects unsupported %s calculations and formatting",
     (currencyCode) => {
       expect(() => calculateQuote(calculation(currencyCode))).toThrow(
@@ -78,6 +82,19 @@ describe("supported two-decimal currency model", () => {
       );
     },
   );
+
+  it("defines and applies explicit currency exponents", () => {
+    expect(currencyMinorUnitExponent("INR")).toBe(2);
+    expect(currencyMinorUnitExponent("CAD")).toBe(2);
+    expect(currencyMinorUnitExponent("KWD")).toBe(3);
+    expect(currencyMinorUnitExponent("JPY")).toBe(0);
+    expect(parseDecimalMinor("12.34", "CAD")).toBe(1234);
+    expect(parseDecimalMinor("12.345", "KWD")).toBe(12345);
+    expect(parseDecimalMinor("1234", "JPY")).toBe(1234);
+    expect(parseDecimalMinor("12.3", "JPY")).toBeNull();
+    expect(formatMinor(12345, "KWD", "en-KW")).toContain("12.345");
+    expect(formatMinor(1234, "JPY", "ja-JP")).toContain("1,234");
+  });
 
   it("normalizes supported human-entry currency codes to uppercase", () => {
     expect(normalizeSupportedCurrency(" usd ")).toBe("USD");
@@ -90,13 +107,17 @@ describe("supported two-decimal currency model", () => {
     ).toBe("GBP");
   });
 
-  it("rejects unsupported product and customer currencies", () => {
+  it("accepts newly supported product and customer currencies", () => {
     expect(
-      productSchema.safeParse({ ...product, currencyCode: "JPY" }).success,
-    ).toBe(false);
+      productSchema.safeParse({
+        ...product,
+        currencyCode: "JPY",
+        unitPrice: "1",
+      }).success,
+    ).toBe(true);
     expect(
       customerSchema.safeParse({ ...customer, preferredCurrencyCode: "KWD" })
         .success,
-    ).toBe(false);
+    ).toBe(true);
   });
 });

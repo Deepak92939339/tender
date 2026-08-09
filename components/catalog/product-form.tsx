@@ -5,7 +5,10 @@ import {
   createProduct,
   type MutationState,
 } from "@/app/(application)/catalog/actions";
-import { SUPPORTED_CURRENCY_CODES } from "@/lib/formatting/currency";
+import {
+  currencyMinorUnitExponent,
+  SUPPORTED_CURRENCY_CODES,
+} from "@/lib/formatting/currency";
 
 type TaxProfile = { id: string; code: string; label: string };
 
@@ -77,7 +80,7 @@ export function ProductForm({
           <input
             name="unitPrice"
             inputMode="decimal"
-            placeholder="0.00"
+            placeholder={`0${currencyMinorUnitExponent(currencyCode) > 0 ? `.${"0".repeat(currencyMinorUnitExponent(currencyCode))}` : ""}`}
             required
           />
         </label>

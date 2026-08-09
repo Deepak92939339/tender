@@ -8,6 +8,9 @@ describe("catalog commercial input", () => {
     expect(parseDecimalMinor("12.34")).toBe(1234);
     expect(parseDecimalMinor("90071992547409.92")).toBeNull();
     expect(parseDecimalMinor("1.234")).toBeNull();
+    expect(parseDecimalMinor("1.234", "KWD")).toBe(1234);
+    expect(parseDecimalMinor("123", "JPY")).toBe(123);
+    expect(parseDecimalMinor("123.0", "JPY")).toBeNull();
   });
 
   it("enforces UoM quantity precision", () => {

@@ -1190,6 +1190,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      currency_minor_unit_exponent: {
+        Args: { p_currency_code: string };
+        Returns: number;
+      };
       execute_scoped_quote_command: {
         Args: {
           p_action: string;
@@ -1252,6 +1256,10 @@ export type Database = {
       organization_local_date: {
         Args: { p_at: string; p_organization_id: string };
         Returns: string;
+      };
+      parse_currency_minor: {
+        Args: { p_currency_code: string; p_value: string };
+        Returns: number;
       };
       prepare_catalog_import: {
         Args: { p_filename: string; p_organization_id: string; p_rows: Json };
