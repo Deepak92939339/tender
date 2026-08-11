@@ -17,11 +17,28 @@ test("account, organization, sign-out, deep-link sign-in and refresh", async ({
   await expect(page).toHaveURL(/\/onboarding$/);
 
   await page.getByLabel("Organization name").fill(organization);
-  await page.getByLabel("Organization URL").fill(slug);
+  const slugInput = page.getByLabel("Workspace URL slug");
+  await expect(slugInput).toHaveValue(
+    new RegExp(`^e2e-${testInfo.project.name}`),
+  );
+  await slugInput.fill("landmark.org");
+  await expect(
+    page.getByRole("button", { name: "Create organization" }),
+  ).toBeDisabled();
+  await expect(page.getByText("Use 3–64 lowercase letters")).toBeVisible();
+  await slugInput.fill(slug);
+  await page.screenshot({
+    path: testInfo.outputPath(`onboarding-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page).toHaveURL(/\/quotes$/);
   await expect(page.getByRole("heading", { name: "Quotes" })).toBeVisible();
   await expect(page.getByText(organization, { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath(`post-onboarding-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/$/);

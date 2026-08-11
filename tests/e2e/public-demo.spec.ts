@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("public decision room offers a calculator-backed anonymous sample", async ({
+test("public specimen uses all five exponent-aware markets and live authoritative totals", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -13,49 +13,81 @@ test("public decision room offers a calculator-backed anonymous sample", async (
   await page.keyboard.press("Tab");
   await expect(skipLink).toBeFocused();
   await expect(skipLink).toBeInViewport();
+  await page.evaluate(() =>
+    (globalThis.document.activeElement as HTMLElement | null)?.blur(),
+  );
   await expect(
     page.getByRole("heading", {
       name: "Priced once. Approved on the record. Issued unchanged.",
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Build a sample quote" }),
-  ).toHaveAttribute("href", "#sample-builder");
-  await expect(
-    page.locator(".decision-documents").getByLabel("INR sample quotation"),
-  ).toBeVisible();
-  await expect(
-    page.locator(".decision-documents").getByLabel("USD sample quotation"),
-  ).toBeVisible();
+  await page.getByRole("link", { name: "Try it — no account" }).click();
+  const preview = page.getByLabel("Live sample quotation document");
+  const market = page.getByLabel("Market");
+  await expect(market.locator("option")).toHaveCount(5);
+  for (const [value, currency, decimals] of [
+    ["india", "INR", 2],
+    ["canada", "CAD", 2],
+    ["kuwait", "KWD", 3],
+    ["japan", "JPY", 0],
+    ["united-states", "USD", 2],
+  ] as const) {
+    await market.selectOption(value);
+    const amount = await preview.locator(".sample-total dd").textContent();
+    expect(amount).toContain(currency);
+    expect(amount ?? "").toMatch(
+      decimals === 0
+        ? /\d(?:,\d{3})*(?!\.\d)/
+        : new RegExp(`\\.\\d{${decimals}}`),
+    );
+  }
+  await market.selectOption("india");
+  await page.getByLabel("Tax presentation").selectOption("india-inter");
+  await expect(preview).toContainText("IGST 18%");
+  await page.getByLabel("Tax presentation").selectOption("india-intra");
+  await expect(preview).toContainText("CGST 9%");
+  await expect(preview).toContainText("SGST 9%");
+  await market.selectOption("canada");
+  await page.getByLabel("Tax presentation").selectOption("canada-on");
+  await expect(preview).toContainText("HST 13%");
+  await page.getByLabel("Tax presentation").selectOption("canada-bc");
+  await expect(preview).toContainText("GST 5%");
+  await expect(preview).toContainText("PST 7%");
+  const before = await preview.locator(".sample-total dd").textContent();
+  await page
+    .locator(".sample-editor-line")
+    .first()
+    .getByLabel("Unit price")
+    .fill("200");
+  await expect(preview.locator(".sample-total dd")).not.toHaveText(
+    before ?? "",
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({
-    path: testInfo.outputPath("public-demo-wide-desktop.png"),
+    path: testInfo.outputPath("public-demo-1440x900.png"),
     fullPage: true,
   });
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.screenshot({
-    path: testInfo.outputPath("public-demo-laptop.png"),
-    fullPage: true,
-  });
-  await page.getByRole("link", { name: "Build a sample quote" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Build a sample quote" }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Live sample quotation document")).toContainText(
-    "INR",
-  );
-  await expect(page.getByLabel("Live sample quotation document")).toContainText(
-    "Final amounts include the line discount and tax.",
-  );
-  await page.locator(".sample-editor select").first().selectOption("USD");
-  await expect(page.getByLabel("Live sample quotation document")).toContainText(
-    "USD",
-  );
-  await page.screenshot({
-    path: testInfo.outputPath("public-demo-builder-usd.png"),
-    fullPage: true,
-  });
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `public-demo-${viewport.width}x${viewport.height}.png`,
+      ),
+      fullPage: true,
+    });
+  }
   await page.emulateMedia({ media: "print" });
-  await expect(page.getByLabel("Live sample quotation document")).toBeVisible();
+  await expect(preview).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Save/Print as PDF" }),
   ).toBeHidden();
@@ -63,32 +95,48 @@ test("public decision room offers a calculator-backed anonymous sample", async (
     path: testInfo.outputPath("public-demo-print.png"),
     fullPage: true,
   });
+  await page.pdf({
+    path: testInfo.outputPath("public-demo-a4.pdf"),
+    format: "A4",
+    printBackground: true,
+    preferCSSPageSize: true,
+  });
 });
 
-test("mobile uses document tabs and a single selectable hero document", async ({
+test("mobile form and document tabs move both selection and focus", async ({
   page,
 }, testInfo) => {
   test.skip(
     testInfo.project.name !== "mobile-chrome",
     "Mobile composition only.",
   );
-  await page.goto("/");
-  await expect(
-    page
-      .locator(".decision-mobile-document")
-      .getByLabel("INR sample quotation"),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "USD" }).click();
-  await expect(
-    page
-      .locator(".decision-mobile-document")
-      .getByLabel("USD sample quotation"),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Build a sample quote" }).click();
-  await page.getByRole("tab", { name: "Document" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/#sample-builder");
+  const formTab = page.getByRole("tab", { name: "Form" });
+  const documentTab = page.getByRole("tab", { name: "Document" });
+  await formTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(documentTab).toBeFocused();
+  await expect(documentTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Live sample quotation document")).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(formTab).toBeFocused();
+  await expect(formTab).toHaveAttribute("aria-selected", "true");
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   await page.screenshot({
-    path: testInfo.outputPath("public-demo-mobile-document.png"),
+    path: testInfo.outputPath("public-demo-390x844.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await documentTab.click();
+  await page.screenshot({
+    path: testInfo.outputPath("public-demo-768x1024.png"),
     fullPage: true,
   });
 });

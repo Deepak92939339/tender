@@ -6,7 +6,9 @@ test("landing loads", async ({ page }) => {
     "Priced once. Approved on the record. Issued unchanged.",
   );
   await expect(
-    page.getByRole("heading", { name: "Build a sample quote" }),
+    page.getByRole("heading", {
+      name: "Build one now — nothing is stored.",
+    }),
   ).toBeVisible();
 });
 

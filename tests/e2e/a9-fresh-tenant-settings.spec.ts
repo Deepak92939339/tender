@@ -32,7 +32,7 @@ async function createFreshOrganization(page: Page): Promise<FreshOrganization> {
   await page
     .getByLabel("Organization name", { exact: true })
     .fill(organizationName);
-  await page.getByLabel("Organization URL", { exact: true }).fill(slug);
+  await page.getByLabel("Workspace URL slug", { exact: true }).fill(slug);
   await page
     .getByRole("button", { name: "Create organization", exact: true })
     .click();

@@ -1,14 +1,19 @@
 "use client";
-import { useId, useState } from "react";
+
+import { useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { SampleDocumentPreview } from "./sample-document-preview";
 import {
   calculateSampleQuote,
+  marketFor,
+  publicMarkets,
+  taxPresentationOptions,
   type SampleQuoteState,
 } from "@/lib/demo/sample-quote-adapter";
 
 const initialState: SampleQuoteState = {
-  currency: "INR",
+  marketId: "india",
+  taxPresentation: "india-intra",
   taxMode: "exclusive",
   customerName: "Asha Engineering Works",
   discount: "12",
@@ -29,8 +34,17 @@ const initialState: SampleQuoteState = {
       unitPrice: "3900",
       taxRate: "18",
     },
+    {
+      id: "bracket",
+      description: "Mounting bracket set",
+      quantity: "5",
+      unit: "EA",
+      unitPrice: "1150",
+      taxRate: "18",
+    },
   ],
 };
+
 function ErrorText({ error }: { error: string | null }) {
   return error ? (
     <p className="sample-error" role="alert">
@@ -43,7 +57,19 @@ export function SampleQuoteBuilder() {
   const [state, setState] = useState(initialState);
   const [tab, setTab] = useState<"form" | "document">("form");
   const [error, setError] = useState<string | null>(null);
+  const formTab = useRef<HTMLButtonElement>(null);
+  const documentTab = useRef<HTMLButtonElement>(null);
+  const focusRequested = useRef<"form" | "document" | null>(null);
   const customerId = useId();
+  const market = marketFor(state.marketId);
+  useEffect(() => {
+    if (!focusRequested.current) return;
+    (focusRequested.current === "form"
+      ? formTab
+      : documentTab
+    ).current?.focus();
+    focusRequested.current = null;
+  }, [tab]);
   const update = <K extends keyof SampleQuoteState>(
     key: K,
     value: SampleQuoteState[K],
@@ -59,6 +85,16 @@ export function SampleQuoteBuilder() {
         itemIndex === index ? { ...item, [key]: value } : item,
       ),
     }));
+  const selectMarket = (marketId: SampleQuoteState["marketId"]) => {
+    const next = marketFor(marketId);
+    const defaultPresentation = taxPresentationOptions(marketId)[0].value;
+    setState((current) => ({
+      ...current,
+      marketId,
+      taxPresentation: defaultPresentation,
+      items: current.items.map((item) => ({ ...item, taxRate: next.rate })),
+    }));
+  };
   let calculated: ReturnType<typeof calculateSampleQuote> | null = null;
   let calculationError: string | null = null;
   try {
@@ -66,32 +102,29 @@ export function SampleQuoteBuilder() {
   } catch (cause) {
     calculationError =
       cause instanceof z.ZodError
-        ? (cause.issues[0]?.message ?? "This sample cannot be calculated.")
+        ? (cause.issues[0]?.message ?? "This specimen cannot be calculated.")
         : cause instanceof Error
           ? cause.message
-          : "This sample cannot be calculated.";
+          : "This specimen cannot be calculated.";
   }
-  const preview = calculated ? (
-    <SampleDocumentPreview state={state} quote={calculated} />
-  ) : (
-    <div className="sample-calculation-error" role="alert">
-      {calculationError}
-    </div>
-  );
+  const setMobileTab = (next: "form" | "document", focus = false) => {
+    if (focus) focusRequested.current = next;
+    setTab(next);
+  };
+  const tabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    current: "form" | "document",
+  ) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    setMobileTab(current === "form" ? "document" : "form", true);
+  };
   const print = () => {
-    try {
-      calculateSampleQuote(state);
+    if (calculated) {
       setError(null);
       window.print();
-    } catch (cause) {
-      setError(
-        cause instanceof z.ZodError
-          ? (cause.issues[0]?.message ?? "Fix the sample fields.")
-          : cause instanceof Error
-            ? cause.message
-            : "Fix the sample fields.",
-      );
-    }
+    } else
+      setError(calculationError ?? "Fix the specimen fields before printing.");
   };
   return (
     <section
@@ -100,35 +133,45 @@ export function SampleQuoteBuilder() {
       aria-labelledby="sample-builder-title"
     >
       <div className="sample-builder-heading">
-        <p className="eyebrow">Anonymous specimen</p>
-        <h2 id="sample-builder-title">Build a sample quote</h2>
-        <p>Sample workspace. Nothing is saved.</p>
+        <p className="eyebrow">Anonymous quotation specimen</p>
+        <h2 id="sample-builder-title">Build one now — nothing is stored.</h2>
+        <p>
+          Use a bounded market specimen to see the document update. This does
+          not create or issue a quotation.
+        </p>
       </div>
       <div className="sample-banner">
-        This quotation remains in this browser tab and cannot be issued.
+        <span aria-hidden="true" /> Demo only — this quotation is not issued,
+        not stored, and cannot be sent.
       </div>
       <div
         className="sample-tabs"
         role="tablist"
-        aria-label="Sample quote view"
+        aria-label="Sample quotation view"
       >
         <button
+          ref={formTab}
           id="sample-builder-form-tab"
           role="tab"
           aria-controls="sample-builder-form"
           aria-selected={tab === "form"}
+          tabIndex={tab === "form" ? 0 : -1}
           className={tab === "form" ? "active" : ""}
-          onClick={() => setTab("form")}
+          onClick={() => setMobileTab("form")}
+          onKeyDown={(event) => tabKeyDown(event, "form")}
         >
           Form
         </button>
         <button
+          ref={documentTab}
           id="sample-builder-document-tab"
           role="tab"
           aria-controls="sample-builder-document"
           aria-selected={tab === "document"}
+          tabIndex={tab === "document" ? 0 : -1}
           className={tab === "document" ? "active" : ""}
-          onClick={() => setTab("document")}
+          onClick={() => setMobileTab("document")}
+          onKeyDown={(event) => tabKeyDown(event, "document")}
         >
           Document
         </button>
@@ -142,22 +185,28 @@ export function SampleQuoteBuilder() {
           onSubmit={(event) => event.preventDefault()}
         >
           <fieldset>
-            <legend>Market</legend>
+            <legend>Market and tax treatment</legend>
             <div className="sample-grid-two">
               <label>
-                Currency
+                Market
                 <select
-                  value={state.currency}
+                  aria-label="Market"
+                  value={state.marketId}
                   onChange={(event) =>
-                    update("currency", event.target.value as "INR" | "USD")
+                    selectMarket(
+                      event.target.value as SampleQuoteState["marketId"],
+                    )
                   }
                 >
-                  <option value="INR">INR — Indian rupee</option>
-                  <option value="USD">USD — US dollar</option>
+                  {publicMarkets.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label} — {option.currency}
+                    </option>
+                  ))}
                 </select>
               </label>
               <fieldset className="sample-tax-mode">
-                <legend>Tax basis</legend>
+                <legend>Price basis</legend>
                 <button
                   type="button"
                   aria-pressed={state.taxMode === "exclusive"}
@@ -176,9 +225,32 @@ export function SampleQuoteBuilder() {
                 </button>
               </fieldset>
             </div>
+            <label>
+              Tax presentation
+              <select
+                aria-label="Tax presentation"
+                value={state.taxPresentation}
+                onChange={(event) =>
+                  update(
+                    "taxPresentation",
+                    event.target.value as SampleQuoteState["taxPresentation"],
+                  )
+                }
+              >
+                {taxPresentationOptions(state.marketId).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <small className="sample-derived">
+              {market.currency} · configured specimen only · final amounts are
+              calculated with Tender’s shared money kernel.
+            </small>
           </fieldset>
           <fieldset>
-            <legend>Quote</legend>
+            <legend>Quotation</legend>
             <label htmlFor={customerId}>
               Customer name
               <input
@@ -196,7 +268,9 @@ export function SampleQuoteBuilder() {
                 onChange={(event) => update("discount", event.target.value)}
                 aria-describedby="discount-help"
               />
-              <small id="discount-help">Applied to all line items.</small>
+              <small id="discount-help">
+                Applied consistently by the calculator across all lines.
+              </small>
             </label>
           </fieldset>
           <fieldset>
@@ -204,7 +278,7 @@ export function SampleQuoteBuilder() {
             <div className="sample-editor-lines">
               {state.items.map((item, index) => (
                 <div className="sample-editor-line" key={item.id}>
-                  <label>
+                  <label className="sample-description">
                     Description
                     <input
                       value={item.description}
@@ -215,7 +289,7 @@ export function SampleQuoteBuilder() {
                     />
                   </label>
                   <label>
-                    Quantity
+                    Qty
                     <input
                       inputMode="decimal"
                       value={item.quantity}
@@ -238,17 +312,23 @@ export function SampleQuoteBuilder() {
                     </select>
                   </label>
                   <label>
-                    Tax rate
-                    <select
-                      value={item.taxRate}
+                    Tax %
+                    <input
+                      inputMode="decimal"
+                      value={
+                        state.taxPresentation === "export-zero" ||
+                        state.taxPresentation === "us-none"
+                          ? "0"
+                          : item.taxRate
+                      }
+                      disabled={
+                        state.taxPresentation === "export-zero" ||
+                        state.taxPresentation === "us-none"
+                      }
                       onChange={(event) =>
                         updateItem(index, "taxRate", event.target.value)
                       }
-                    >
-                      <option value="0">0%</option>
-                      <option value="5">5%</option>
-                      <option value="18">18%</option>
-                    </select>
+                    />
                   </label>
                   <label>
                     Unit price
@@ -291,12 +371,12 @@ export function SampleQuoteBuilder() {
                     quantity: "1",
                     unit: "EA",
                     unitPrice: "0",
-                    taxRate: "18",
+                    taxRate: market.rate,
                   },
                 ])
               }
             >
-              Add line item
+              + Add line item
             </button>
           </fieldset>
         </form>
@@ -306,7 +386,15 @@ export function SampleQuoteBuilder() {
           role="tabpanel"
           aria-labelledby="sample-builder-document-tab"
         >
-          <div className="sample-paper">{preview}</div>
+          <div className="sample-paper">
+            {calculated ? (
+              <SampleDocumentPreview state={state} quote={calculated} />
+            ) : (
+              <div className="sample-calculation-error" role="alert">
+                {calculationError}
+              </div>
+            )}
+          </div>
           <div className="sample-actions">
             <button
               type="button"
@@ -320,8 +408,8 @@ export function SampleQuoteBuilder() {
               Save/Print as PDF
             </button>
             <p id="issue-help">
-              Issuing creates an accountable commercial record and requires a
-              signed-in workspace.
+              Issuing requires a signed-in workspace. This anonymous specimen
+              remains only in this tab.
             </p>
             <ErrorText error={error} />
           </div>

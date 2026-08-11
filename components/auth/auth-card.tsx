@@ -45,15 +45,16 @@ export function AuthCard({
         )}
       </section>
       <aside className="auth-context">
-        <span className="threshold-mark" aria-hidden="true" />
-        <p className="eyebrow">Quiet commercial utility</p>
-        <h2>
-          One document. One decision rule. A clear record of what happened.
-        </h2>
-        <p>
-          Tender keeps preparation, approval and issuance distinct without
-          turning commercial work into a dashboard.
-        </p>
+        <div className="auth-context-copy">
+          <p className="eyebrow">Quiet commercial utility</p>
+          <h2>
+            One document. One decision rule. A clear record of what happened.
+          </h2>
+          <p>
+            Tender keeps preparation, approval and issuance distinct without
+            turning commercial work into a dashboard.
+          </p>
+        </div>
       </aside>
     </main>
   );

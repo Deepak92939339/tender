@@ -7,16 +7,13 @@ import {
   logMutationFailure,
   withReference,
 } from "@/lib/errors/mutation-failure";
+import { organizationSlugSchema } from "@/lib/validation/organization";
 
 export type OnboardingState = { error?: string };
 
 const schema = z.object({
   name: z.string().trim().min(1).max(120),
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/),
+  slug: organizationSlugSchema,
   commandId: z.string().uuid(),
 });
 
@@ -41,7 +38,7 @@ export async function createOrganization(
   if (error) {
     const reference = logMutationFailure("organization.create", error);
     const next = error.message.includes("organization_slug_taken")
-      ? "Choose another organization URL and try again."
+      ? "Choose another workspace URL slug and try again."
       : "Your account and data are preserved. Check the fields, then try again.";
     return {
       error: withReference(
