@@ -20,6 +20,8 @@
     "test:auth": "vitest run tests/unit/demo-auth.test.ts",
     "test:db": "supabase test db",
     "test:parity": "node --experimental-strip-types scripts/verify-calculation-parity.ts",
+    "test:commitment-parity": "node --experimental-strip-types scripts/verify-commitment-parity.ts",
+    "test:commitment-concurrency": "node --experimental-strip-types scripts/verify-commitment-concurrency.ts",
     "test:concurrency": "node --env-file=.env.local --experimental-strip-types scripts/verify-quote-concurrency.ts",
     "test:decisions": "node --env-file=.env.local --experimental-strip-types scripts/verify-decision-concurrency.ts",
     "test:secrets": "node scripts/verify-secrets.mjs",

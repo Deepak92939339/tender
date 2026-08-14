@@ -489,6 +489,119 @@ export type Database = {
         };
         Relationships: [];
       };
+      quote_acceptances: {
+        Row: {
+          acceptance_statement: string;
+          acceptance_statement_document: Json;
+          acceptance_statement_hash: string;
+          acceptance_statement_version: number;
+          accepted_at: string;
+          buyer_asserted_name: string;
+          buyer_asserted_title: string | null;
+          calculation_fingerprint: string;
+          calculation_format_version: number;
+          canonical_acceptance_statement: string;
+          id: string;
+          idempotency_key: string;
+          organization_id: string;
+          quote_id: string;
+          recipient_email_snapshot: string;
+          recipient_event_id: string;
+          revision_id: string;
+          share_link_id: string;
+          snapshot_format_version: number;
+          snapshot_hash: string;
+        };
+        Insert: {
+          acceptance_statement: string;
+          acceptance_statement_document: Json;
+          acceptance_statement_hash: string;
+          acceptance_statement_version: number;
+          accepted_at?: string;
+          buyer_asserted_name: string;
+          buyer_asserted_title?: string | null;
+          calculation_fingerprint: string;
+          calculation_format_version: number;
+          canonical_acceptance_statement: string;
+          id?: string;
+          idempotency_key: string;
+          organization_id: string;
+          quote_id: string;
+          recipient_email_snapshot: string;
+          recipient_event_id: string;
+          revision_id: string;
+          share_link_id: string;
+          snapshot_format_version: number;
+          snapshot_hash: string;
+        };
+        Update: {
+          acceptance_statement?: string;
+          acceptance_statement_document?: Json;
+          acceptance_statement_hash?: string;
+          acceptance_statement_version?: number;
+          accepted_at?: string;
+          buyer_asserted_name?: string;
+          buyer_asserted_title?: string | null;
+          calculation_fingerprint?: string;
+          calculation_format_version?: number;
+          canonical_acceptance_statement?: string;
+          id?: string;
+          idempotency_key?: string;
+          organization_id?: string;
+          quote_id?: string;
+          recipient_email_snapshot?: string;
+          recipient_event_id?: string;
+          revision_id?: string;
+          share_link_id?: string;
+          snapshot_format_version?: number;
+          snapshot_hash?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_acceptances_organization_id_quote_id_revision_id_fkey";
+            columns: ["organization_id", "quote_id", "revision_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
+          {
+            foreignKeyName: "quote_acceptances_organization_id_quote_id_revision_id_sha_fkey";
+            columns: [
+              "organization_id",
+              "quote_id",
+              "revision_id",
+              "share_link_id",
+              "recipient_event_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "quote_recipient_events";
+            referencedColumns: [
+              "organization_id",
+              "quote_id",
+              "revision_id",
+              "share_link_id",
+              "id",
+            ];
+          },
+          {
+            foreignKeyName: "quote_acceptances_organization_id_quote_id_share_link_id_r_fkey";
+            columns: [
+              "organization_id",
+              "quote_id",
+              "share_link_id",
+              "revision_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "quote_share_links";
+            referencedColumns: [
+              "organization_id",
+              "quote_id",
+              "id",
+              "revision_id",
+            ];
+          },
+        ];
+      };
       quote_activity: {
         Row: {
           actor_name_snapshot: string;
@@ -709,6 +822,243 @@ export type Database = {
           },
         ];
       };
+      quote_public_rate_buckets: {
+        Row: {
+          bucket_started_at: string;
+          expires_at: string;
+          operation: string;
+          request_count: number;
+          subject_hash: string;
+        };
+        Insert: {
+          bucket_started_at: string;
+          expires_at: string;
+          operation: string;
+          request_count: number;
+          subject_hash: string;
+        };
+        Update: {
+          bucket_started_at?: string;
+          expires_at?: string;
+          operation?: string;
+          request_count?: number;
+          subject_hash?: string;
+        };
+        Relationships: [];
+      };
+      quote_recipient_events: {
+        Row: {
+          created_at: string;
+          event_type: Database["public"]["Enums"]["quote_recipient_event_type"];
+          id: string;
+          idempotency_key: string;
+          message: string | null;
+          organization_id: string;
+          quote_id: string;
+          request_hash: string;
+          revision_id: string;
+          share_link_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          event_type: Database["public"]["Enums"]["quote_recipient_event_type"];
+          id?: string;
+          idempotency_key: string;
+          message?: string | null;
+          organization_id: string;
+          quote_id: string;
+          request_hash: string;
+          revision_id: string;
+          share_link_id: string;
+        };
+        Update: {
+          created_at?: string;
+          event_type?: Database["public"]["Enums"]["quote_recipient_event_type"];
+          id?: string;
+          idempotency_key?: string;
+          message?: string | null;
+          organization_id?: string;
+          quote_id?: string;
+          request_hash?: string;
+          revision_id?: string;
+          share_link_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_recipient_events_organization_id_quote_id_revision_i_fkey";
+            columns: ["organization_id", "quote_id", "revision_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
+          {
+            foreignKeyName: "quote_recipient_events_organization_id_quote_id_share_link_fkey";
+            columns: [
+              "organization_id",
+              "quote_id",
+              "share_link_id",
+              "revision_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "quote_share_links";
+            referencedColumns: [
+              "organization_id",
+              "quote_id",
+              "id",
+              "revision_id",
+            ];
+          },
+        ];
+      };
+      quote_revisions: {
+        Row: {
+          approval_reason_codes: string[];
+          approval_threshold_bps: number | null;
+          approved_at: string | null;
+          approved_by: string | null;
+          calculation_document: Json | null;
+          calculation_fingerprint: string | null;
+          calculation_format_version: number | null;
+          calculation_hash: string | null;
+          canonical_calculation: string | null;
+          canonical_snapshot: string | null;
+          created_at: string;
+          created_by: string;
+          currency_code: string | null;
+          id: string;
+          issued_at: string | null;
+          issued_by: string | null;
+          legacy_captured_at: string | null;
+          legacy_snapshot: Json | null;
+          legacy_source_revision_id: string | null;
+          organization_id: string;
+          parent_revision_id: string | null;
+          quote_id: string;
+          record_kind: Database["public"]["Enums"]["quote_revision_record_kind"];
+          rejected_at: string | null;
+          rejected_by: string | null;
+          rejected_reason: string | null;
+          requires_manual_approval: boolean | null;
+          revision_number: number;
+          snapshot: Json | null;
+          snapshot_format_version: number | null;
+          snapshot_hash: string | null;
+          source_quote_version: number;
+          state: Database["public"]["Enums"]["quote_state"];
+          submitted_at: string | null;
+          submitted_by: string | null;
+          total_minor: number | null;
+          valid_until: string | null;
+          verification_code: string | null;
+        };
+        Insert: {
+          approval_reason_codes?: string[];
+          approval_threshold_bps?: number | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          calculation_document?: Json | null;
+          calculation_fingerprint?: string | null;
+          calculation_format_version?: number | null;
+          calculation_hash?: string | null;
+          canonical_calculation?: string | null;
+          canonical_snapshot?: string | null;
+          created_at?: string;
+          created_by: string;
+          currency_code?: string | null;
+          id?: string;
+          issued_at?: string | null;
+          issued_by?: string | null;
+          legacy_captured_at?: string | null;
+          legacy_snapshot?: Json | null;
+          legacy_source_revision_id?: string | null;
+          organization_id: string;
+          parent_revision_id?: string | null;
+          quote_id: string;
+          record_kind: Database["public"]["Enums"]["quote_revision_record_kind"];
+          rejected_at?: string | null;
+          rejected_by?: string | null;
+          rejected_reason?: string | null;
+          requires_manual_approval?: boolean | null;
+          revision_number: number;
+          snapshot?: Json | null;
+          snapshot_format_version?: number | null;
+          snapshot_hash?: string | null;
+          source_quote_version: number;
+          state: Database["public"]["Enums"]["quote_state"];
+          submitted_at?: string | null;
+          submitted_by?: string | null;
+          total_minor?: number | null;
+          valid_until?: string | null;
+          verification_code?: string | null;
+        };
+        Update: {
+          approval_reason_codes?: string[];
+          approval_threshold_bps?: number | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          calculation_document?: Json | null;
+          calculation_fingerprint?: string | null;
+          calculation_format_version?: number | null;
+          calculation_hash?: string | null;
+          canonical_calculation?: string | null;
+          canonical_snapshot?: string | null;
+          created_at?: string;
+          created_by?: string;
+          currency_code?: string | null;
+          id?: string;
+          issued_at?: string | null;
+          issued_by?: string | null;
+          legacy_captured_at?: string | null;
+          legacy_snapshot?: Json | null;
+          legacy_source_revision_id?: string | null;
+          organization_id?: string;
+          parent_revision_id?: string | null;
+          quote_id?: string;
+          record_kind?: Database["public"]["Enums"]["quote_revision_record_kind"];
+          rejected_at?: string | null;
+          rejected_by?: string | null;
+          rejected_reason?: string | null;
+          requires_manual_approval?: boolean | null;
+          revision_number?: number;
+          snapshot?: Json | null;
+          snapshot_format_version?: number | null;
+          snapshot_hash?: string | null;
+          source_quote_version?: number;
+          state?: Database["public"]["Enums"]["quote_state"];
+          submitted_at?: string | null;
+          submitted_by?: string | null;
+          total_minor?: number | null;
+          valid_until?: string | null;
+          verification_code?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_revisions_legacy_source_fkey";
+            columns: [
+              "organization_id",
+              "quote_id",
+              "legacy_source_revision_id",
+            ];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
+          {
+            foreignKeyName: "quote_revisions_organization_id_quote_id_fkey";
+            columns: ["organization_id", "quote_id"];
+            isOneToOne: false;
+            referencedRelation: "quotes";
+            referencedColumns: ["organization_id", "id"];
+          },
+          {
+            foreignKeyName: "quote_revisions_parent_fkey";
+            columns: ["organization_id", "quote_id", "parent_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
+        ];
+      };
       quote_sequences: {
         Row: {
           last_value: number;
@@ -735,8 +1085,71 @@ export type Database = {
           },
         ];
       };
+      quote_share_links: {
+        Row: {
+          created_at: string;
+          created_by: string;
+          disabled_at: string | null;
+          disabled_reason:
+            Database["public"]["Enums"]["quote_share_disabled_reason"] | null;
+          expires_at: string;
+          id: string;
+          organization_id: string;
+          quote_id: string;
+          recipient_email: string;
+          revision_id: string;
+          selector: string;
+          token_format_version: number;
+          token_hash: string;
+          token_hash_algorithm: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by: string;
+          disabled_at?: string | null;
+          disabled_reason?:
+            Database["public"]["Enums"]["quote_share_disabled_reason"] | null;
+          expires_at: string;
+          id?: string;
+          organization_id: string;
+          quote_id: string;
+          recipient_email: string;
+          revision_id: string;
+          selector?: string;
+          token_format_version?: number;
+          token_hash: string;
+          token_hash_algorithm?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string;
+          disabled_at?: string | null;
+          disabled_reason?:
+            Database["public"]["Enums"]["quote_share_disabled_reason"] | null;
+          expires_at?: string;
+          id?: string;
+          organization_id?: string;
+          quote_id?: string;
+          recipient_email?: string;
+          revision_id?: string;
+          selector?: string;
+          token_format_version?: number;
+          token_hash?: string;
+          token_hash_algorithm?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quote_share_links_organization_id_quote_id_revision_id_fkey";
+            columns: ["organization_id", "quote_id", "revision_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
+        ];
+      };
       quotes: {
         Row: {
+          accepted_revision_id: string | null;
           approval_threshold_bps_snapshot: number | null;
           approved_at: string | null;
           approved_by: string | null;
@@ -753,6 +1166,7 @@ export type Database = {
           created_at: string;
           created_by: string;
           currency_code: string;
+          current_revision_id: string | null;
           customer_id: string;
           customer_name_snapshot: string | null;
           customer_tax_treatment: Database["public"]["Enums"]["tax_treatment"];
@@ -771,6 +1185,7 @@ export type Database = {
           rejected_at: string | null;
           rejected_by: string | null;
           rejected_reason: string | null;
+          revision_counter: number;
           seller_address_line1_snapshot: string | null;
           seller_address_line2_snapshot: string | null;
           seller_city_snapshot: string | null;
@@ -795,6 +1210,7 @@ export type Database = {
           version: number;
         };
         Insert: {
+          accepted_revision_id?: string | null;
           approval_threshold_bps_snapshot?: number | null;
           approved_at?: string | null;
           approved_by?: string | null;
@@ -811,6 +1227,7 @@ export type Database = {
           created_at?: string;
           created_by: string;
           currency_code: string;
+          current_revision_id?: string | null;
           customer_id: string;
           customer_name_snapshot?: string | null;
           customer_tax_treatment: Database["public"]["Enums"]["tax_treatment"];
@@ -829,6 +1246,7 @@ export type Database = {
           rejected_at?: string | null;
           rejected_by?: string | null;
           rejected_reason?: string | null;
+          revision_counter?: number;
           seller_address_line1_snapshot?: string | null;
           seller_address_line2_snapshot?: string | null;
           seller_city_snapshot?: string | null;
@@ -853,6 +1271,7 @@ export type Database = {
           version?: number;
         };
         Update: {
+          accepted_revision_id?: string | null;
           approval_threshold_bps_snapshot?: number | null;
           approved_at?: string | null;
           approved_by?: string | null;
@@ -869,6 +1288,7 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           currency_code?: string;
+          current_revision_id?: string | null;
           customer_id?: string;
           customer_name_snapshot?: string | null;
           customer_tax_treatment?: Database["public"]["Enums"]["tax_treatment"];
@@ -887,6 +1307,7 @@ export type Database = {
           rejected_at?: string | null;
           rejected_by?: string | null;
           rejected_reason?: string | null;
+          revision_counter?: number;
           seller_address_line1_snapshot?: string | null;
           seller_address_line2_snapshot?: string | null;
           seller_city_snapshot?: string | null;
@@ -911,6 +1332,20 @@ export type Database = {
           version?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "quotes_accepted_revision_fkey";
+            columns: ["organization_id", "id", "accepted_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
+          {
+            foreignKeyName: "quotes_current_revision_fkey";
+            columns: ["organization_id", "id", "current_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "quote_revisions";
+            referencedColumns: ["organization_id", "quote_id", "id"];
+          },
           {
             foreignKeyName: "quotes_organization_id_customer_id_fkey";
             columns: ["organization_id", "customer_id"];
@@ -1095,12 +1530,54 @@ export type Database = {
             };
             Returns: Json;
           };
+      begin_quote_revision: {
+        Args: {
+          p_base_revision_id: string;
+          p_command_id: string;
+          p_expected_version: number;
+          p_quote_id: string;
+        };
+        Returns: Json;
+      };
+      broker_accept_quote: {
+        Args: {
+          p_acceptance_statement_version?: number;
+          p_buyer_asserted_name: string;
+          p_buyer_asserted_title?: string;
+          p_idempotency_key: string;
+          p_secret: string;
+          p_selector: string;
+          p_subject_hash: string;
+        };
+        Returns: Json;
+      };
+      broker_open_quote: {
+        Args: { p_secret: string; p_selector: string; p_subject_hash: string };
+        Returns: Json;
+      };
+      broker_record_quote_event: {
+        Args: {
+          p_event_type: Database["public"]["Enums"]["quote_recipient_event_type"];
+          p_idempotency_key: string;
+          p_message?: string;
+          p_secret: string;
+          p_selector: string;
+          p_subject_hash: string;
+        };
+        Returns: Json;
+      };
+      broker_verify_quote: {
+        Args: { p_subject_hash: string; p_verification_code: string };
+        Returns: Json;
+      };
       calculate_quote_payload: { Args: { p_payload: Json }; Returns: Json };
       calculate_quote_payload_c2_legacy_impl: {
         Args: { p_payload: Json };
         Returns: Json;
       };
       calculate_quote_payloads: { Args: { p_payloads: Json }; Returns: Json };
+      canonical_json_string_v1: { Args: { p_value: string }; Returns: string };
+      canonical_json_v1: { Args: { p_value: Json }; Returns: string };
       command_receipt_replay: {
         Args: {
           p_aggregate_id: string;
@@ -1129,6 +1606,19 @@ export type Database = {
           p_command_id: string;
         };
         Returns: Json;
+      };
+      constant_time_bytea_equal: {
+        Args: { p_left: string; p_right: string };
+        Returns: boolean;
+      };
+      consume_quote_public_rate_limit: {
+        Args: {
+          p_limit: number;
+          p_operation: string;
+          p_subject_hash: string;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
       };
       create_customer: {
         Args: {
@@ -1182,6 +1672,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      create_quote_share_link: {
+        Args: {
+          p_command_id: string;
+          p_expected_version: number;
+          p_expires_at: string;
+          p_quote_id: string;
+          p_recipient_email: string;
+          p_revision_id: string;
+        };
+        Returns: Json;
+      };
       create_tax_profile: {
         Args: {
           p_command_id: string;
@@ -1190,9 +1691,34 @@ export type Database = {
         };
         Returns: Json;
       };
+      create_verified_quote_draft: {
+        Args: {
+          p_command_id: string;
+          p_currency_code: string;
+          p_customer_id: string;
+          p_issue_date: string;
+          p_locale: string;
+          p_organization_id: string;
+          p_tax_label: string;
+          p_tax_mode: Database["public"]["Enums"]["tax_price_basis"];
+          p_valid_until: string;
+        };
+        Returns: Json;
+      };
       currency_minor_unit_exponent: {
         Args: { p_currency_code: string };
         Returns: number;
+      };
+      execute_quote_revision_command: {
+        Args: {
+          p_action: string;
+          p_command_id: string;
+          p_expected_version: number;
+          p_quote_id: string;
+          p_reason?: string;
+          p_revision_id: string;
+        };
+        Returns: Json;
       };
       execute_scoped_quote_command: {
         Args: {
@@ -1265,7 +1791,22 @@ export type Database = {
         Args: { p_filename: string; p_organization_id: string; p_rows: Json };
         Returns: Json;
       };
+      quote_acceptance_statement_v1: {
+        Args: {
+          p_buyer_asserted_name: string;
+          p_buyer_asserted_title: string;
+          p_calculation_fingerprint: string;
+          p_format_version?: number;
+          p_revision_id: string;
+          p_snapshot_hash: string;
+        };
+        Returns: Json;
+      };
       quote_actor: { Args: { p_organization_id: string }; Returns: Json };
+      quote_calculation_document_v1: {
+        Args: { p_quote_id: string };
+        Returns: Json;
+      };
       quote_draft_projection: {
         Args: { p_organization_id: string; p_quote_id: string };
         Returns: Json;
@@ -1278,6 +1819,27 @@ export type Database = {
           p_valid_until: string;
         };
         Returns: Database["public"]["Enums"]["quote_state"];
+      };
+      quote_public_link_status: {
+        Args: {
+          p_limit?: number;
+          p_operation: string;
+          p_secret: string;
+          p_selector: string;
+          p_subject_hash: string;
+          p_window_seconds?: number;
+        };
+        Returns: Json;
+      };
+      quote_snapshot_v1: {
+        Args: {
+          p_calculation_fingerprint: string;
+          p_reason_codes: string[];
+          p_requires_manual: boolean;
+          p_revision_id: string;
+          p_threshold_bps: number;
+        };
+        Returns: Json;
       };
       recalculate_quote: {
         Args: { p_organization_id: string; p_quote_id: string };
@@ -1320,6 +1882,15 @@ export type Database = {
           p_expected_version: number;
           p_quote_id: string;
           p_reason: string;
+        };
+        Returns: Json;
+      };
+      revoke_quote_share_link: {
+        Args: {
+          p_command_id: string;
+          p_expected_version: number;
+          p_quote_id: string;
+          p_share_link_id: string;
         };
         Returns: Json;
       };
@@ -1405,6 +1976,15 @@ export type Database = {
         };
         Returns: undefined;
       };
+      sha256_hex: { Args: { p_value: string }; Returns: string };
+      start_verified_revision_from_legacy_quote: {
+        Args: {
+          p_command_id: string;
+          p_expected_version: number;
+          p_quote_id: string;
+        };
+        Returns: Json;
+      };
       submit_quote: {
         Args: {
           p_command_id: string;
@@ -1480,6 +2060,10 @@ export type Database = {
         | "packaging"
         | "customs_duties"
         | "other";
+      quote_recipient_event_type:
+        "viewed" | "change_requested" | "declined" | "accepted";
+      quote_revision_record_kind: "verified_revision" | "legacy_capture";
+      quote_share_disabled_reason: "revoked" | "superseded" | "accepted";
       quote_state:
         "draft" | "waiting" | "approved" | "rejected" | "issued" | "expired";
       tax_price_basis: "exclusive" | "inclusive";
@@ -1628,6 +2212,14 @@ export const Constants = {
         "customs_duties",
         "other",
       ],
+      quote_recipient_event_type: [
+        "viewed",
+        "change_requested",
+        "declined",
+        "accepted",
+      ],
+      quote_revision_record_kind: ["verified_revision", "legacy_capture"],
+      quote_share_disabled_reason: ["revoked", "superseded", "accepted"],
       quote_state: [
         "draft",
         "waiting",
