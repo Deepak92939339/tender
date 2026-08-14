@@ -33,7 +33,17 @@ Set these runtime variables for Production (and Preview only if previews should 
 
 Do not add `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_DB_URL` to Vercel.
 
-## 4. Preflight and smoke test
+## 4. Isolated public broker Edge Function
+
+The browser and Next.js/Vercel runtime remain limited to public Supabase configuration. Deploy `supabase/functions/trusted-public-broker` separately as a public Supabase Edge Function and configure its Edge-only secret:
+
+- `PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET`
+
+The Supabase Edge runtime supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The service-role credential is permitted only inside this function and only for its fixed calls to `broker_open_quote`, `broker_record_quote_event`, `broker_accept_quote`, and `broker_verify_quote`. Never copy it into Vercel, Next.js, browser code, environment examples, build arguments, or logs. The deployment ingress must overwrite the trusted client-address headers used by the function before requests reach the Edge runtime.
+
+Keep JWT verification disabled for this deliberately public function; the raw share secret or verification code is the public capability, while PostgreSQL remains authoritative for token validation, rate limits, idempotency, effective state, and revision-scoped terminal responses. Confirm after deployment that direct `anon` and `authenticated` PostgREST calls to all four broker RPCs remain denied.
+
+## 5. Preflight and smoke test
 
 Before deployment, run `npm ci`, `npm run verify`, and a production build with the intended demo flag. After deployment:
 

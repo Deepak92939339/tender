@@ -22,6 +22,8 @@
     "test:parity": "node --experimental-strip-types scripts/verify-calculation-parity.ts",
     "test:commitment-parity": "node --experimental-strip-types scripts/verify-commitment-parity.ts",
     "test:commitment-concurrency": "node --experimental-strip-types scripts/verify-commitment-concurrency.ts",
+    "test:broker": "vitest run tests/unit/trusted-public-broker.test.ts",
+    "test:broker:integration": "node scripts/verify-edge-broker.mjs",
     "test:concurrency": "node --env-file=.env.local --experimental-strip-types scripts/verify-quote-concurrency.ts",
     "test:decisions": "node --env-file=.env.local --experimental-strip-types scripts/verify-decision-concurrency.ts",
     "test:secrets": "node scripts/verify-secrets.mjs",

@@ -1,4 +1,4 @@
-import type { CanonicalQuoteSnapshotV1 } from "./canonical-snapshot";
+import type { CanonicalQuoteSnapshotV1 } from "./canonical-snapshot.ts";
 
 export type VerifiedRevisionState =
   "draft" | "waiting" | "approved" | "rejected" | "issued";
