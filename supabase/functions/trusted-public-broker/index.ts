@@ -21,6 +21,7 @@ const database = createRestBrokerDatabase(
 const handler = createBrokerHandler({
   database,
   hmacSecret: requiredEdgeSecret("PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET"),
+  transportSecret: requiredEdgeSecret("TENDER_EDGE_BROKER_TRANSPORT_SECRET"),
   log(entry) {
     console.info(JSON.stringify(entry));
   },

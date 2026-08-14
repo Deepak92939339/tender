@@ -30,18 +30,31 @@ Set these runtime variables for Production (and Preview only if previews should 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `TENDER_DEMO_MODE=true`
+- `TENDER_EDGE_BROKER_TRANSPORT_SECRET`
+- `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY`
 
-Do not add `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_DB_URL` to Vercel.
+The two `TENDER_` values are server-only. The transport secret authenticates only the fixed Next-to-Edge broker envelope and does not grant database access. The session key encrypts and authenticates the short-lived capability cookie. Do not expose either with a `NEXT_PUBLIC_` prefix. Do not add `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, or `PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET` to Vercel.
 
 ## 4. Isolated public broker Edge Function
 
-The browser and Next.js/Vercel runtime remain limited to public Supabase configuration. Deploy `supabase/functions/trusted-public-broker` separately as a public Supabase Edge Function and configure its Edge-only secret:
+The browser remains limited to public Supabase configuration. Next calls this function only through its signed server-to-server transport. Deploy `supabase/functions/trusted-public-broker` separately and configure these function secrets:
 
+- `TENDER_EDGE_BROKER_TRANSPORT_SECRET` (shared only with the Next server runtime)
 - `PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET`
 
-The Supabase Edge runtime supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The service-role credential is permitted only inside this function and only for its fixed calls to `broker_open_quote`, `broker_record_quote_event`, `broker_accept_quote`, and `broker_verify_quote`. Never copy it into Vercel, Next.js, browser code, environment examples, build arguments, or logs. The deployment ingress must overwrite the trusted client-address headers used by the function before requests reach the Edge runtime.
+The Supabase Edge runtime supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The service-role credential is permitted only inside this function and only for its fixed calls to `broker_open_quote`, `broker_record_quote_event`, `broker_accept_quote`, and `broker_verify_quote`. Never copy it into Vercel, Next.js, browser code, environment examples, build arguments, or logs. The Edge handler does not read public forwarding headers. It accepts a normalized client-address representation only after authenticating the HMAC envelope from Next.
 
-Keep JWT verification disabled for this deliberately public function; the raw share secret or verification code is the public capability, while PostgreSQL remains authoritative for token validation, rate limits, idempotency, effective state, and revision-scoped terminal responses. Confirm after deployment that direct `anon` and `authenticated` PostgREST calls to all four broker RPCs remain denied.
+Keep JWT verification disabled at the Supabase gateway so the HMAC-authenticated service-to-service request can reach the handler. Supabase documents that this makes the gateway route publicly invocable, so the function's signed-envelope check is mandatory and direct unsigned requests must return `401` before database dispatch. PostgreSQL remains authoritative for token validation, selector/code rate buckets, idempotency, effective state, and revision-scoped terminal responses. Confirm after deployment that direct `anon` and `authenticated` PostgREST calls to all four broker RPCs remain denied. See [Supabase Authorization headers](https://supabase.com/docs/guides/functions/auth-headers) and [Function configuration](https://supabase.com/docs/guides/functions/function-configuration).
+
+### Trusted client address
+
+On a direct Vercel deployment, the Next runtime may normalize `x-forwarded-for` only when the documented `VERCEL=1` system marker is present. Vercel documents `x-forwarded-for` as the client's public IP and says it overwrites the header to prevent spoofing. A proxy in front of Vercel changes that guarantee unless Vercel Trusted Proxy is deliberately configured. See [Vercel request headers](https://vercel.com/docs/headers/request-headers) and [system environment variables](https://vercel.com/docs/environment-variables/system-environment-variables).
+
+Local, self-hosted, missing, multi-valued, or malformed address input becomes `unattributed:v1`; the implementation does not fall back to `x-real-ip`, `cf-connecting-ip`, or an arbitrary forwarding chain. Next signs the normalized representation, and Edge uses it only after signature verification. PostgreSQL's selector- and verification-code-specific buckets remain active when the non-IP fallback is used.
+
+### Capability session
+
+The same-origin session exchange stores only the selector, raw share secret, version, and a five-minute absolute expiry in an AES-256-GCM cookie. The cookie is `HttpOnly`, host-only, `SameSite=Strict`, `Secure` in production, and scoped to `/api/public-quotes`. It is not independent authority: every use is revalidated by the broker, so revoked, superseded, expired, accepted, or otherwise terminal link authority stops working immediately and causes the cookie to be cleared. The committed Stage 1 open projection does not expose the link's exact timestamp, so the browser cookie uses the short fixed storage lifetime while PostgreSQL enforces the exact earlier authority cutoff.
 
 ## 5. Preflight and smoke test
 

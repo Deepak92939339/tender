@@ -317,7 +317,7 @@ function isJsonContentType(value: string | null) {
   );
 }
 
-export async function readBrokerRequest(request: Request) {
+export async function readBrokerRequestBody(request: Request) {
   if (request.method !== "POST") {
     throw new RequestValidationError(
       "method_not_allowed",
@@ -352,6 +352,10 @@ export async function readBrokerRequest(request: Request) {
       "The request body is too large.",
     );
   }
+  return bytes;
+}
+
+export function parseBrokerActionBytes(bytes: Uint8Array) {
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -371,4 +375,8 @@ export async function readBrokerRequest(request: Request) {
     );
   }
   return parseBrokerAction(value);
+}
+
+export async function readBrokerRequest(request: Request) {
+  return parseBrokerActionBytes(await readBrokerRequestBody(request));
 }

@@ -2,7 +2,12 @@ import { projectBrokerResult } from "./projection.ts";
 import { deriveRateLimitSubject } from "./rate-subject.ts";
 import type { BrokerDatabase } from "./rpc.ts";
 import {
-  readBrokerRequest,
+  TransportAuthenticationError,
+  verifySignedBrokerTransport,
+} from "../../../lib/public-quotes/transport.ts";
+import {
+  parseBrokerActionBytes,
+  readBrokerRequestBody,
   RequestValidationError,
   type BrokerActionName,
 } from "./validation.ts";
@@ -18,6 +23,7 @@ export type BrokerLogEntry = {
 type Dependencies = {
   database: BrokerDatabase;
   hmacSecret: string;
+  transportSecret: string;
   log: (entry: BrokerLogEntry) => void;
   randomId?: () => string;
 };
@@ -81,15 +87,28 @@ function resultStatus(status: string) {
 
 export function createBrokerHandler(dependencies: Dependencies) {
   return async (request: Request) => {
-    const requestId = dependencies.randomId
+    let requestId = dependencies.randomId
       ? dependencies.randomId()
       : crypto.randomUUID();
     let actionName: BrokerActionName | "unresolved" = "unresolved";
     try {
-      const action = await readBrokerRequest(request);
+      const bodyBytes = await readBrokerRequestBody(request);
+      const transport = await verifySignedBrokerTransport({
+        method: request.method,
+        headers: request.headers,
+        bodyBytes,
+        secret: dependencies.transportSecret,
+      });
+      requestId = transport.requestId;
+      const action = parseBrokerActionBytes(bodyBytes);
+      if (action.action !== transport.action) {
+        throw new TransportAuthenticationError(
+          "transport_authentication_failed",
+        );
+      }
       actionName = action.action;
       const subjectHash = await deriveRateLimitSubject(
-        request,
+        transport.clientAddress,
         dependencies.hmacSecret,
       );
       const databaseResult = await dependencies.database.invoke(
@@ -106,6 +125,23 @@ export function createBrokerHandler(dependencies: Dependencies) {
       });
       return response(resultStatus(result.status), result, requestId);
     } catch (error) {
+      if (error instanceof TransportAuthenticationError) {
+        dependencies.log({
+          component: "trusted-public-broker",
+          requestId,
+          action: "unresolved",
+          outcome: "rejected",
+          status: error.code,
+        });
+        return response(
+          401,
+          {
+            status: "invalid_request",
+            code: "transport_authentication_failed",
+          },
+          requestId,
+        );
+      }
       if (error instanceof RequestValidationError) {
         dependencies.log({
           component: "trusted-public-broker",

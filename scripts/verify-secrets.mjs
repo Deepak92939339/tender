@@ -28,7 +28,7 @@ const rawPatterns = [
   /\b(?:sb_secret_|ghp_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]{12,}\b/,
 ];
 const assignedSecret =
-  /\b(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_URL|FRIDAY_GATEWAY_SECRET|FRIDAY_N8N_WEBHOOK_SECRET|N8N_[A-Z0-9_]*SECRET)[\t ]*=[\t ]*([^\s#]*)/g;
+  /\b(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_URL|TENDER_EDGE_BROKER_TRANSPORT_SECRET|TENDER_PUBLIC_SESSION_ENCRYPTION_KEY|PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET|FRIDAY_GATEWAY_SECRET|FRIDAY_N8N_WEBHOOK_SECRET|N8N_[A-Z0-9_]*SECRET)[\t ]*=[\t ]*([^\s#]*)/g;
 const placeholders = new Set([
   "",
   "replace_me",
@@ -71,7 +71,7 @@ collectClientFiles(clientRoot);
 for (const path of clientFiles) {
   const source = readFileSync(path, "utf8");
   if (
-    /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_URL|postgres(?:ql)?:\/\/|sb_secret_|ghp_|github_pat_|xox[baprs]-/.test(
+    /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_URL|TENDER_EDGE_BROKER_TRANSPORT_SECRET|TENDER_PUBLIC_SESSION_ENCRYPTION_KEY|PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET|postgres(?:ql)?:\/\/|sb_secret_|ghp_|github_pat_|xox[baprs]-/.test(
       source,
     )
   ) {

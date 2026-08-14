@@ -8,6 +8,12 @@ const projectId = "tender-local-visual-study";
 const databaseContainer = `supabase_db_${projectId}`;
 const hmacSecretName = "PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET";
 const hmacSecret = randomBytes(48).toString("base64url");
+const transportSecretName = "TENDER_EDGE_BROKER_TRANSPORT_SECRET";
+const transportSecret = randomBytes(48).toString("base64url");
+const sessionSecretName = "TENDER_PUBLIC_SESSION_ENCRYPTION_KEY";
+const sessionSecret = randomBytes(48).toString("base64url");
+const nextPort = 3117;
+const nextOrigin = `http://localhost:${nextPort}`;
 const runId = randomBytes(8).toString("hex");
 const marker = `edge-broker-integration:${runId}`;
 const localOnlyEnvironment = {
@@ -17,7 +23,9 @@ const localOnlyEnvironment = {
 };
 let checks = 0;
 let functionProcess;
+let nextProcess;
 let functionDiagnostic = "";
+let nextDiagnostic = "";
 let temporaryDirectory;
 let rateBucketStartedAt;
 
@@ -87,9 +95,11 @@ function localStatus() {
 function startFunctionServer() {
   temporaryDirectory = mkdtempSync(join(tmpdir(), "tender-edge-broker-"));
   const environmentFile = join(temporaryDirectory, "edge.env");
-  writeFileSync(environmentFile, `${hmacSecretName}=${hmacSecret}\n`, {
-    mode: 0o600,
-  });
+  writeFileSync(
+    environmentFile,
+    `${hmacSecretName}=${hmacSecret}\n${transportSecretName}=${transportSecret}\n`,
+    { mode: 0o600 },
+  );
   functionProcess = spawn(
     "./node_modules/.bin/supabase",
     [
@@ -102,7 +112,11 @@ function startFunctionServer() {
     ],
     {
       cwd: process.cwd(),
-      env: { ...localOnlyEnvironment, [hmacSecretName]: hmacSecret },
+      env: {
+        ...localOnlyEnvironment,
+        [hmacSecretName]: hmacSecret,
+        [transportSecretName]: transportSecret,
+      },
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     },
@@ -129,7 +143,6 @@ async function waitForFunction(endpoint, anonKey) {
         headers: {
           apikey: anonKey,
           "content-type": "application/json",
-          "x-forwarded-for": "198.51.100.1",
         },
         body: JSON.stringify({
           action: "verify",
@@ -141,9 +154,8 @@ async function waitForFunction(endpoint, anonKey) {
       try {
         const body = JSON.parse(responseText);
         if (
-          body?.status === "not_found" ||
-          body?.status === "unavailable" ||
-          body?.status === "invalid_request"
+          body?.status === "invalid_request" ||
+          body?.status === "unavailable"
         ) {
           return;
         }
@@ -157,6 +169,52 @@ async function waitForFunction(endpoint, anonKey) {
   }
   fail(
     `The local Edge runtime did not become ready. ${functionDiagnostic || "No runtime diagnostic was emitted."}`,
+  );
+}
+
+function startNextServer(apiUrl, anonKey) {
+  nextProcess = spawn(
+    "./node_modules/.bin/next",
+    ["dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(nextPort)],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...localOnlyEnvironment,
+        NEXT_PUBLIC_SUPABASE_URL: apiUrl,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
+        [transportSecretName]: transportSecret,
+        [sessionSecretName]: sessionSecret,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    },
+  );
+  const capture = (chunk) => {
+    nextDiagnostic = safeDiagnostic(`${nextDiagnostic}${chunk}`).slice(-2_000);
+  };
+  nextProcess.stdout.on("data", capture);
+  nextProcess.stderr.on("data", capture);
+}
+
+async function waitForNext() {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (nextProcess.exitCode !== null) {
+      fail(
+        `The local Next runtime stopped before becoming ready. ${nextDiagnostic || "No runtime diagnostic was emitted."}`,
+      );
+    }
+    try {
+      const response = await fetch(`${nextOrigin}/`, {
+        signal: AbortSignal.timeout(1_500),
+      });
+      if (response.ok) return;
+    } catch {
+      // The loopback Next runtime is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  fail(
+    `The local Next runtime did not become ready. ${nextDiagnostic || "No runtime diagnostic was emitted."}`,
   );
 }
 
@@ -253,9 +311,9 @@ select jsonb_object_agg(scenario, value) from edge_broker_fixtures;
 commit;`;
 }
 
-function rateSubject(ip) {
+function rateSubject(clientAddress = "unattributed:v1") {
   return createHmac("sha256", hmacSecret)
-    .update(`trusted-public-broker:v1\0x-forwarded-for:${ip}`)
+    .update(`trusted-public-broker:v2\0${clientAddress}`)
     .digest("hex");
 }
 
@@ -279,13 +337,15 @@ async function localFetch(url, init) {
   fail("A loopback HTTP request failed.");
 }
 
-async function edgeCall(endpoint, anonKey, body, ip) {
+async function unsignedEdgeCall(endpoint, anonKey, body) {
   const response = await localFetch(endpoint, {
     method: "POST",
     headers: {
       apikey: anonKey,
       "content-type": "application/json",
-      "x-forwarded-for": ip,
+      "x-forwarded-for": "203.0.113.200",
+      "x-real-ip": "203.0.113.201",
+      "cf-connecting-ip": "203.0.113.202",
     },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(5_000),
@@ -302,6 +362,99 @@ async function edgeCall(endpoint, anonKey, body, ip) {
   return { response, body: parsed };
 }
 
+const sessionCookies = new Map();
+
+async function nextRouteCall(path, body, cookie, method = "POST") {
+  const headers = {
+    origin: nextOrigin,
+    "x-forwarded-for": "203.0.113.200",
+    "x-real-ip": "203.0.113.201",
+    "cf-connecting-ip": "203.0.113.202",
+  };
+  if (body !== undefined) headers["content-type"] = "application/json";
+  if (cookie) headers.cookie = cookie;
+  const response = await localFetch(`${nextOrigin}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(8_000),
+  });
+  const text = await response.text();
+  let parsed = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      fail(
+        `The Next response was not JSON (HTTP ${response.status}): ${safeDiagnostic(text)}`,
+      );
+    }
+  }
+  return { response, body: parsed };
+}
+
+async function nextBrokerCall(body) {
+  if (body.action === "open") {
+    const result = await nextRouteCall("/api/public-quotes/session", {
+      selector: body.selector,
+      secret: body.secret,
+    });
+    if (result.response.ok) {
+      const cookie = result.response.headers
+        .get("set-cookie")
+        ?.split(";", 1)[0];
+      check(
+        Boolean(cookie),
+        "A successful session exchange did not set a cookie.",
+      );
+      sessionCookies.set(body.selector, cookie);
+      return {
+        response: result.response,
+        body: { status: "ok", value: result.body },
+      };
+    }
+    return result;
+  }
+  if (body.action === "verify") {
+    const result = await nextRouteCall("/api/public-quotes/verify", {
+      verificationCode: body.verificationCode,
+    });
+    return result.response.ok
+      ? {
+          response: result.response,
+          body: { status: "ok", value: result.body },
+        }
+      : result;
+  }
+  if (!sessionCookies.has(body.selector)) {
+    const opened = await nextBrokerCall({
+      action: "open",
+      selector: body.selector,
+      secret: body.secret,
+    });
+    check(
+      opened.response.ok && opened.body?.status === "ok",
+      "The action preflight session exchange failed.",
+    );
+  }
+  const cookie = sessionCookies.get(body.selector);
+  check(
+    Boolean(cookie),
+    "A recipient action was attempted without a session exchange.",
+  );
+  const browserBody = { ...body };
+  delete browserBody.selector;
+  delete browserBody.secret;
+  const result = await nextRouteCall(
+    "/api/public-quotes/action",
+    browserBody,
+    cookie,
+  );
+  return result.response.ok
+    ? { response: result.response, body: { status: "ok", value: result.body } }
+    : result;
+}
+
 function stopFunctionServer() {
   if (!functionProcess) return;
   if (functionProcess.exitCode === null && functionProcess.pid) {
@@ -314,6 +467,20 @@ function stopFunctionServer() {
   functionProcess.stdout.destroy();
   functionProcess.stderr.destroy();
   functionProcess.unref();
+}
+
+function stopNextServer() {
+  if (!nextProcess) return;
+  if (nextProcess.exitCode === null && nextProcess.pid) {
+    try {
+      process.kill(-nextProcess.pid, "SIGTERM");
+    } catch {
+      nextProcess.kill("SIGTERM");
+    }
+  }
+  nextProcess.stdout.destroy();
+  nextProcess.stderr.destroy();
+  nextProcess.unref();
 }
 
 function link(fixtures, scenario, index = 0) {
@@ -388,78 +555,108 @@ async function main() {
   startFunctionServer();
   const endpoint = `${apiUrl}/functions/v1/trusted-public-broker`;
   await waitForFunction(endpoint, anonKey);
-  const fixtures = JSON.parse(psql(fixtureSql()));
-  const usedIps = [];
-  const call = async (body, suffix) => {
-    const ip = `198.51.100.${suffix}`;
-    usedIps.push(ip);
-    return edgeCall(endpoint, anonKey, body, ip);
-  };
-
-  const changeLink = link(fixtures, "change");
-  const opened = await call(
-    {
-      action: "open",
-      selector: changeLink.selector,
-      secret: changeLink.secret,
-    },
-    10,
+  const unsigned = await unsignedEdgeCall(endpoint, anonKey, {
+    action: "verify",
+    verificationCode: "0".repeat(32),
+  });
+  check(
+    unsigned.response.status === 401 &&
+      unsigned.body?.code === "transport_authentication_failed",
+    "The Edge broker did not reject a direct unsigned public request.",
+  );
+  startNextServer(apiUrl, anonKey);
+  await waitForNext();
+  const unsupportedMethod = await localFetch(
+    `${nextOrigin}/api/public-quotes/action`,
+    { method: "GET", signal: AbortSignal.timeout(5_000) },
   );
   check(
+    unsupportedMethod.status === 405,
+    "The Next action route did not reject an unsupported method.",
+  );
+  const crossOrigin = await localFetch(
+    `${nextOrigin}/api/public-quotes/session`,
+    {
+      method: "POST",
+      headers: {
+        origin: "https://cross-origin.invalid",
+        "content-type": "application/json",
+      },
+      body: "{}",
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  check(
+    crossOrigin.status === 403 &&
+      crossOrigin.headers.get("cache-control") === "no-store",
+    "The Next session route did not enforce same-origin with no-store.",
+  );
+  const wrongContentType = await localFetch(
+    `${nextOrigin}/api/public-quotes/verify`,
+    {
+      method: "POST",
+      headers: { origin: nextOrigin, "content-type": "text/plain" },
+      body: "{}",
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  check(
+    wrongContentType.status === 415 &&
+      wrongContentType.headers.get("cache-control") === "no-store",
+    "The Next verification route did not enforce JSON with no-store.",
+  );
+  const fixtures = JSON.parse(psql(fixtureSql()));
+  const call = async (body) => nextBrokerCall(body);
+
+  const changeLink = link(fixtures, "change");
+  const opened = await call({
+    action: "open",
+    selector: changeLink.selector,
+    secret: changeLink.secret,
+  });
+  check(
     opened.response.status === 200 && opened.body.status === "ok",
-    "Open failed.",
+    `Open failed with HTTP ${opened.response.status} and status ${String(opened.body?.status ?? "missing")}. Next: ${nextDiagnostic} Edge: ${functionDiagnostic}`,
   );
 
   const viewKey = randomUUID();
-  const viewed = await call(
-    {
-      action: "record_event",
-      eventType: "viewed",
-      selector: changeLink.selector,
-      secret: changeLink.secret,
-      idempotencyKey: viewKey,
-    },
-    11,
-  );
-  const viewReplay = await call(
-    {
-      action: "record_event",
-      eventType: "viewed",
-      selector: changeLink.selector,
-      secret: changeLink.secret,
-      idempotencyKey: viewKey,
-    },
-    12,
-  );
+  const viewed = await call({
+    action: "record_event",
+    eventType: "viewed",
+    selector: changeLink.selector,
+    secret: changeLink.secret,
+    idempotencyKey: viewKey,
+  });
+  const viewReplay = await call({
+    action: "record_event",
+    eventType: "viewed",
+    selector: changeLink.selector,
+    secret: changeLink.secret,
+    idempotencyKey: viewKey,
+  });
   check(
     viewed.body.value.eventId === viewReplay.body.value.eventId,
     "View replay was not idempotent.",
   );
 
-  const changed = await call(
-    {
-      action: "record_event",
-      eventType: "change_requested",
-      selector: changeLink.selector,
-      secret: changeLink.secret,
-      idempotencyKey: randomUUID(),
-      message: "Please change delivery terms.",
-    },
-    13,
-  );
+  const changed = await call({
+    action: "record_event",
+    eventType: "change_requested",
+    selector: changeLink.selector,
+    secret: changeLink.secret,
+    idempotencyKey: randomUUID(),
+    message: "Please change delivery terms.",
+  });
   check(
     changed.response.status === 200 &&
       changed.body.value.type === "change_requested",
     "Change request failed.",
   );
-  const openedAfterChange = await call(
-    {
-      action: "open",
-      selector: changeLink.selector,
-      secret: changeLink.secret,
-    },
-    14,
-  );
+  const openedAfterChange = await call({
+    action: "open",
+    selector: changeLink.selector,
+    secret: changeLink.secret,
+  });
   check(
     openedAfterChange.body.value.responseType === "change_requested" &&
       openedAfterChange.body.value.acceptanceAllowed === false,
@@ -467,16 +664,13 @@ async function main() {
   );
 
   const declineLink = link(fixtures, "decline");
-  const declined = await call(
-    {
-      action: "record_event",
-      eventType: "declined",
-      selector: declineLink.selector,
-      secret: declineLink.secret,
-      idempotencyKey: randomUUID(),
-    },
-    15,
-  );
+  const declined = await call({
+    action: "record_event",
+    eventType: "declined",
+    selector: declineLink.selector,
+    secret: declineLink.secret,
+    idempotencyKey: randomUUID(),
+  });
   check(
     declined.response.status === 200 && declined.body.value.type === "declined",
     "Decline failed.",
@@ -493,8 +687,8 @@ async function main() {
     buyerAssertedTitle: "Procurement Lead",
     acceptanceStatementVersion: 1,
   };
-  const accepted = await call(acceptanceRequest, 16);
-  const acceptanceReplay = await call(acceptanceRequest, 17);
+  const accepted = await call(acceptanceRequest);
+  const acceptanceReplay = await call(acceptanceRequest);
   check(
     accepted.response.status === 200 && accepted.body.value.replayed === false,
     "Acceptance failed.",
@@ -506,10 +700,10 @@ async function main() {
         accepted.body.value.acceptanceId,
     "Acceptance replay was not stable.",
   );
-  const verified = await call(
-    { action: "verify", verificationCode: fixtures.accept.verificationCode },
-    18,
-  );
+  const verified = await call({
+    action: "verify",
+    verificationCode: fixtures.accept.verificationCode,
+  });
   check(
     verified.response.status === 200 &&
       verified.body.value.verified === true &&
@@ -517,16 +711,17 @@ async function main() {
     "Verification failed.",
   );
 
-  for (const [scenario, expectedStatus, suffix] of [
-    ["expired", "expired", 19],
-    ["revoked", "revoked", 20],
-    ["superseded", "superseded", 21],
+  for (const [scenario, expectedStatus] of [
+    ["expired", "expired"],
+    ["revoked", "revoked"],
+    ["superseded", "superseded"],
   ]) {
     const target = link(fixtures, scenario);
-    const result = await call(
-      { action: "open", selector: target.selector, secret: target.secret },
-      suffix,
-    );
+    const result = await call({
+      action: "open",
+      selector: target.selector,
+      secret: target.secret,
+    });
     check(
       result.response.status === 410 && result.body.status === expectedStatus,
       `${scenario} link semantics failed.`,
@@ -536,27 +731,21 @@ async function main() {
   const competeFirst = link(fixtures, "compete", 0);
   const competeSecond = link(fixtures, "compete", 1);
   const competing = await Promise.all([
-    call(
-      {
-        action: "accept",
-        selector: competeFirst.selector,
-        secret: competeFirst.secret,
-        idempotencyKey: randomUUID(),
-        buyerAssertedName: "Concurrent Buyer",
-        acceptanceStatementVersion: 1,
-      },
-      22,
-    ),
-    call(
-      {
-        action: "record_event",
-        eventType: "declined",
-        selector: competeSecond.selector,
-        secret: competeSecond.secret,
-        idempotencyKey: randomUUID(),
-      },
-      23,
-    ),
+    call({
+      action: "accept",
+      selector: competeFirst.selector,
+      secret: competeFirst.secret,
+      idempotencyKey: randomUUID(),
+      buyerAssertedName: "Concurrent Buyer",
+      acceptanceStatementVersion: 1,
+    }),
+    call({
+      action: "record_event",
+      eventType: "declined",
+      selector: competeSecond.selector,
+      secret: competeSecond.secret,
+      idempotencyKey: randomUUID(),
+    }),
   ]);
   check(
     competing.filter((result) => result.response.status === 200).length === 1,
@@ -579,8 +768,7 @@ async function main() {
   );
   const subjects = [
     ...new Set([
-      rateSubject("198.51.100.1"),
-      ...usedIps.map(rateSubject),
+      rateSubject(),
       ...allSelectors.map(selectorSubject),
       codeSubject(fixtures.accept.verificationCode),
       codeSubject("0".repeat(32)),
@@ -603,6 +791,7 @@ async function main() {
 try {
   await main();
 } finally {
+  stopNextServer();
   stopFunctionServer();
   if (temporaryDirectory) {
     rmSync(temporaryDirectory, { recursive: true, force: true });
