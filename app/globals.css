@@ -261,6 +261,375 @@ body {
     "Segoe UI",
     sans-serif;
 }
+
+/* Recipient commitment view: uses Tender's shared document and green action tokens. */
+.recipient-shell {
+  min-height: 100vh;
+  background: var(--canvas);
+}
+.recipient-header {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.recipient-content {
+  width: min(980px, calc(100% - 40px));
+  margin: 18px auto 56px;
+  display: grid;
+  gap: 22px;
+}
+.recipient-access {
+  width: min(620px, calc(100% - 40px));
+  margin: 14vh auto;
+  padding: 32px;
+  border-top: 3px solid var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-document);
+}
+.recipient-access h1,
+.recipient-document h1,
+.recipient-dialog h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.035em;
+}
+.recipient-document {
+  border-top: 3px solid var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-document);
+}
+.recipient-document-header,
+.recipient-parties,
+.recipient-lines,
+.recipient-charges,
+.recipient-notes,
+.recipient-document footer {
+  padding-left: clamp(20px, 4vw, 44px);
+  padding-right: clamp(20px, 4vw, 44px);
+}
+.recipient-document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding-top: 30px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.recipient-document-header h1 {
+  margin: 3px 0;
+  font-size: clamp(30px, 5vw, 42px);
+}
+.recipient-document-header p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+}
+.recipient-state {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 5px 10px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.recipient-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  padding-top: 22px;
+  padding-bottom: 22px;
+  background: var(--surface-cool);
+  border-bottom: 1px solid var(--line);
+}
+.recipient-parties address {
+  display: grid;
+  gap: 4px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+.recipient-parties span,
+.recipient-document h2 {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.recipient-parties small {
+  color: var(--muted);
+}
+.recipient-lines {
+  padding-top: 24px;
+  overflow-x: auto;
+}
+.recipient-lines table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.recipient-lines th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ink);
+  padding: 10px;
+}
+.recipient-lines td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+.recipient-lines td:first-child span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.recipient-lines th:not(:first-child),
+.recipient-lines td:not(:first-child) {
+  text-align: right;
+}
+.recipient-charges {
+  padding-top: 8px;
+}
+.recipient-charges p {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+.recipient-totals {
+  width: min(380px, calc(100% - 40px));
+  margin: 20px clamp(20px, 4vw, 44px) 24px auto;
+}
+.recipient-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.recipient-totals dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.recipient-grand-total {
+  border-top: 1px solid var(--ink);
+  font-size: 18px;
+  font-weight: 750;
+}
+.recipient-notes {
+  padding-bottom: 22px;
+}
+.recipient-notes p {
+  white-space: pre-wrap;
+}
+.recipient-document footer {
+  padding-top: 16px;
+  padding-bottom: 26px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.recipient-document code {
+  color: var(--ink);
+}
+.recipient-actions,
+.recipient-verification {
+  padding: 24px clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  background: var(--surface);
+}
+.recipient-actions h2,
+.recipient-verification h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+.recipient-actions p,
+.recipient-verification p {
+  color: var(--muted);
+}
+.recipient-action-row,
+.recipient-verification form,
+.recipient-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+.recipient-shell button {
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 650;
+  cursor: pointer;
+}
+.recipient-shell button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+.recipient-shell button.danger {
+  color: var(--danger);
+  border-color: #d7a6a6;
+}
+.recipient-shell button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.recipient-verification label,
+.recipient-dialog label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.recipient-verification input,
+.recipient-dialog input,
+.recipient-dialog textarea {
+  min-height: 44px;
+  width: min(460px, 100%);
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.recipient-dialog textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+.recipient-verified {
+  color: var(--success) !important;
+  font-weight: 700;
+}
+.recipient-dialog-backdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(23 33 43 / 0.48);
+}
+.recipient-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 28px;
+  border-top: 3px solid var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-document);
+}
+.recipient-dialog h2 {
+  margin-top: 0;
+  font-size: 26px;
+}
+.recipient-dialog-actions {
+  justify-content: end;
+  margin-top: 22px;
+}
+@media (max-width: 640px) {
+  .recipient-header,
+  .recipient-content {
+    width: min(100% - 32px, 980px);
+  }
+  .recipient-header {
+    min-height: 62px;
+  }
+  .recipient-document-header,
+  .recipient-parties {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+  .recipient-lines thead {
+    display: none;
+  }
+  .recipient-lines,
+  .recipient-lines tbody,
+  .recipient-lines tr,
+  .recipient-lines td {
+    display: block;
+    width: 100%;
+  }
+  .recipient-lines tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .recipient-lines td {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 4px 0;
+    border: 0;
+    text-align: right !important;
+  }
+  .recipient-lines td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  .recipient-lines td:first-child {
+    display: block;
+    text-align: left !important;
+  }
+  .recipient-action-row,
+  .recipient-action-row button,
+  .recipient-verification form,
+  .recipient-verification label {
+    width: 100%;
+  }
+  .recipient-dialog-actions {
+    flex-direction: column-reverse;
+  }
+  .recipient-dialog-actions button {
+    width: 100%;
+  }
+}
+@media print {
+  body:has(.recipient-shell) > *:not(.recipient-shell),
+  .recipient-header,
+  .recipient-actions,
+  .recipient-verification,
+  .recipient-dialog-backdrop {
+    display: none !important;
+  }
+  .recipient-shell {
+    background: white;
+  }
+  .recipient-content {
+    display: block;
+    width: auto;
+    margin: 0;
+  }
+  .recipient-document {
+    box-shadow: none;
+    border: 0;
+  }
+  .recipient-document-header,
+  .recipient-parties,
+  .recipient-lines tr,
+  .recipient-totals div,
+  .recipient-document footer {
+    break-inside: avoid;
+  }
+}
 a {
   color: inherit;
   text-underline-offset: 3px;
