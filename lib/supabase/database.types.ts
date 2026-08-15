@@ -1791,6 +1791,10 @@ export type Database = {
         Args: { p_filename: string; p_organization_id: string; p_rows: Json };
         Returns: Json;
       };
+      quote_acceptance_statement_text_v1: {
+        Args: { p_format_version?: number };
+        Returns: string;
+      };
       quote_acceptance_statement_v1: {
         Args: {
           p_buyer_asserted_name: string;

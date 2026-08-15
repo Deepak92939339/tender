@@ -515,6 +515,17 @@ body {
   color: var(--success) !important;
   font-weight: 700;
 }
+.recipient-statement {
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface-cool);
+  color: var(--ink) !important;
+}
+.recipient-acceptance-evidence {
+  padding: 18px clamp(20px, 3vw, 28px);
+  border-left: 3px solid var(--success);
+  background: var(--accent-soft);
+}
 .recipient-dialog-backdrop {
   position: fixed;
   z-index: 90;
@@ -607,6 +618,7 @@ body {
   .recipient-header,
   .recipient-actions,
   .recipient-verification,
+  .recipient-acceptance-evidence,
   .recipient-dialog-backdrop {
     display: none !important;
   }

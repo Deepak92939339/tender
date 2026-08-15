@@ -117,6 +117,8 @@ export type BuyerQuoteProjection = {
   snapshot: CanonicalQuoteSnapshotV1;
   responseType: RecipientEventType | null;
   acceptanceAllowed: boolean;
+  acceptanceStatementVersion: 1;
+  acceptanceStatement: string;
 };
 
 export type BuyerResponseProjection = {

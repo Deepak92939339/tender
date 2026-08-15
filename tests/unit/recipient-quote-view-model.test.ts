@@ -18,6 +18,9 @@ const projection = (currencyVector = 0): BuyerQuoteProjection => ({
   snapshot: canonicalV1Vectors[currencyVector]!.snapshot,
   responseType: null,
   acceptanceAllowed: true,
+  acceptanceStatementVersion: 1,
+  acceptanceStatement:
+    "I accept this exact Tender quotation revision and acknowledge that the name and title provided are buyer-asserted.",
 });
 
 describe("recipient quote view model", () => {

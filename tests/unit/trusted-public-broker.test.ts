@@ -58,6 +58,9 @@ function databaseResult(action: string) {
           valid_until: "2099-01-01",
           response_type: null,
           acceptance_allowed: true,
+          acceptance_statement_version: 1,
+          acceptance_statement:
+            "I accept this exact Tender quotation revision and acknowledge that the name and title provided are buyer-asserted.",
           organization_id: "must-not-escape",
         },
       };
@@ -369,13 +372,20 @@ describe("trusted public broker dispatch and output", () => {
       },
     ],
     ["verify", { action: "verify", verificationCode: "A".repeat(32) }],
-  ])("returns a bounded %s projection", async (_action, body) => {
+  ])("returns a bounded %s projection", async (action, body) => {
     const { handler } = handlerWith();
     const response = await handler(request(body));
     expect(response.status).toBe(200);
     const json = await response.text();
     expect(json).not.toContain("organization_id");
     expect(json).not.toContain("must-not-escape");
+    if (action === "open") {
+      const parsed = JSON.parse(json) as { value: Record<string, unknown> };
+      expect(parsed.value.acceptanceStatementVersion).toBe(1);
+      expect(parsed.value.acceptanceStatement).toBe(
+        "I accept this exact Tender quotation revision and acknowledge that the name and title provided are buyer-asserted.",
+      );
+    }
   });
 
   it.each([

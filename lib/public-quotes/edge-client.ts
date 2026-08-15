@@ -60,6 +60,8 @@ const PROJECTION_FIELDS: Record<TransportBrokerAction, readonly string[]> = {
     "snapshot",
     "responseType",
     "acceptanceAllowed",
+    "acceptanceStatementVersion",
+    "acceptanceStatement",
   ],
   record_event: [
     "eventId",

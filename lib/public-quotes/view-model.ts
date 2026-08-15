@@ -10,6 +10,8 @@ export type RecipientQuoteViewModel = {
   effectiveState: BuyerQuoteProjection["effectiveState"];
   responseType: BuyerQuoteProjection["responseType"];
   acceptanceAllowed: boolean;
+  acceptanceStatementVersion: 1;
+  acceptanceStatement: string;
   currencyCode: string;
   locale: string;
   issueDate: string;
@@ -53,6 +55,8 @@ export function recipientQuoteViewModel(
     effectiveState: projection.effectiveState,
     responseType: projection.responseType,
     acceptanceAllowed: projection.acceptanceAllowed,
+    acceptanceStatementVersion: projection.acceptanceStatementVersion,
+    acceptanceStatement: projection.acceptanceStatement,
     currencyCode,
     locale,
     issueDate: snapshot.commercial.issue_date,

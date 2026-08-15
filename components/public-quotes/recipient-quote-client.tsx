@@ -19,6 +19,7 @@ import {
   verificationViewModel,
   type RecipientQuoteViewModel,
 } from "@/lib/public-quotes/view-model";
+import type { AcceptanceProjection } from "@/lib/quotes/commitment-contracts";
 
 type AccessStatus =
   | "loading"
@@ -183,6 +184,10 @@ export function RecipientQuoteClient({ selector }: { selector: string }) {
   const [quote, setQuote] = useState<RecipientQuoteViewModel | null>(null);
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [mutation, setMutation] = useState<MutationStatus>("idle");
+  const [acceptance, setAcceptance] = useState<AcceptanceProjection | null>(
+    null,
+  );
+  const acceptanceKey = useRef<string | null>(null);
   const [verification, setVerification] = useState<VerificationState>({
     status: "idle",
     result: null,
@@ -280,6 +285,31 @@ export function RecipientQuoteClient({ selector }: { selector: string }) {
         result as unknown as VerificationProjection,
       ),
     });
+  }
+
+  async function accept(buyerAssertedName: string, buyerAssertedTitle: string) {
+    setMutation("pending");
+    acceptanceKey.current ??= crypto.randomUUID();
+    const { result } = await post("/api/public-quotes/action", {
+      action: "accept",
+      idempotencyKey: acceptanceKey.current,
+      buyerAssertedName,
+      buyerAssertedTitle: buyerAssertedTitle || null,
+      acceptanceStatementVersion: quote?.acceptanceStatementVersion,
+    }).catch(() => ({ result: { status: "unavailable" } }));
+    const status = result.status as MutationStatus | undefined;
+    if (status) {
+      setMutation(status);
+      if (terminalMessages[status as AccessStatus])
+        setAccess(status as AccessStatus);
+      return;
+    }
+    setAcceptance(result as unknown as AcceptanceProjection);
+    setMutation("success");
+    setQuote((current) =>
+      current ? { ...current, responseType: "accepted" } : current,
+    );
+    setDialog(null);
   }
 
   if (access !== "ready" || !quote)
@@ -457,8 +487,11 @@ export function RecipientQuoteClient({ selector }: { selector: string }) {
               </button>
               <button
                 className="primary"
-                disabled
-                title="Acceptance is unavailable until the authoritative statement is available to this view."
+                onClick={() => {
+                  acceptanceKey.current = null;
+                  setMutation("idle");
+                  setDialog("accept");
+                }}
               >
                 Accept quotation
               </button>
@@ -485,6 +518,29 @@ export function RecipientQuoteClient({ selector }: { selector: string }) {
         onClose={() => setDialog(null)}
         onSubmit={() => void submit("declined")}
       />
+      <AcceptanceDialog
+        open={dialog === "accept"}
+        pending={mutation === "pending"}
+        status={mutation}
+        statement={quote.acceptanceStatement}
+        onClose={() => setDialog(null)}
+        onSubmit={(name, title) => void accept(name, title)}
+      />
+      {acceptance && (
+        <section className="recipient-acceptance-evidence" role="status">
+          <strong>Acceptance recorded</strong>
+          <p>
+            {new Intl.DateTimeFormat(quote.locale, {
+              dateStyle: "long",
+              timeStyle: "short",
+            }).format(new Date(acceptance.acceptedAt))}
+          </p>
+          <p>
+            Statement evidence ·{" "}
+            <code>{acceptance.acceptanceStatementHash.slice(0, 16)}</code>
+          </p>
+        </section>
+      )}
     </main>
   );
 }
@@ -606,6 +662,99 @@ function DeclineDialog({
           {pending ? "Recording…" : "Confirm decline"}
         </button>
       </div>
+    </Dialog>
+  );
+}
+
+function AcceptanceDialog({
+  open,
+  pending,
+  status,
+  statement,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  pending: boolean;
+  status: MutationStatus;
+  statement: string;
+  onClose(): void;
+  onSubmit(name: string, title: string): void;
+}) {
+  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <Dialog
+      open={open}
+      title="Accept quotation"
+      pending={pending}
+      onClose={onClose}
+    >
+      <p className="recipient-statement">{statement}</p>
+      <p>
+        Acceptance is an electronic commercial acknowledgement. Tender does not
+        certify identity and no drawn signature is requested.
+      </p>
+      <form
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          const normalizedName = name.normalize("NFC").trim();
+          const normalizedTitle = title.normalize("NFC").trim();
+          const valid = (value: string, optional = false) =>
+            (optional && !value) ||
+            (Array.from(value).length >= 1 &&
+              Array.from(value).length <= 200 &&
+              !/[\u0000-\u001f\u007f-\u009f]/.test(value));
+          if (!valid(normalizedName) || !valid(normalizedTitle, true)) {
+            setError(
+              "Enter a buyer-asserted name and an optional title of up to 200 supported characters.",
+            );
+            return;
+          }
+          setError("");
+          onSubmit(normalizedName, normalizedTitle);
+        }}
+      >
+        <label>
+          Buyer-asserted full name
+          <input
+            data-autofocus
+            autoComplete="name"
+            value={name}
+            disabled={pending}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label>
+          Buyer-asserted title (optional)
+          <input
+            autoComplete="organization-title"
+            value={title}
+            disabled={pending}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </label>
+        <p>
+          These details are buyer-asserted only; Tender does not certify
+          identity.
+        </p>
+        {error && <p role="alert">{error}</p>}
+        {status !== "idle" && status !== "pending" && status !== "success" && (
+          <p role="alert">
+            {terminalMessages[status as AccessStatus] ??
+              "Acceptance could not be recorded."}
+          </p>
+        )}
+        <div className="recipient-dialog-actions">
+          <button type="button" onClick={onClose} disabled={pending}>
+            Cancel
+          </button>
+          <button className="primary" type="submit" disabled={pending}>
+            {pending ? "Recording…" : "Accept quotation"}
+          </button>
+        </div>
+      </form>
     </Dialog>
   );
 }

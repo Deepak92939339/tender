@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(84);
+select plan(88);
 
 select ok(not exists (
   select 1 from pg_constraint where conname in ('quotes_current_revision_fkey', 'quotes_accepted_revision_fkey') and not convalidated
@@ -16,6 +16,8 @@ select has_table('quote_acceptances', 'acceptance table exists');
 select has_table('quote_public_rate_buckets', 'database rate buckets exist');
 
 select ok(not has_function_privilege('anon', 'public.broker_open_quote(uuid,text,bytea)', 'execute'), 'anon cannot execute broker open');
+select ok(not has_function_privilege('anon', 'public.quote_acceptance_statement_text_v1(smallint)', 'execute'), 'anon cannot execute acceptance statement helper');
+select ok(not has_function_privilege('authenticated', 'public.quote_acceptance_statement_text_v1(smallint)', 'execute'), 'authenticated cannot execute acceptance statement helper');
 select ok(not has_function_privilege('authenticated', 'public.broker_open_quote(uuid,text,bytea)', 'execute'), 'authenticated cannot execute broker open');
 select ok(has_function_privilege('service_role', 'public.broker_open_quote(uuid,text,bytea)', 'execute'), 'service role alone can execute broker open');
 select ok(not has_table_privilege('service_role', 'public.quote_share_links', 'select'), 'service role has no direct share-link table select grant');
@@ -250,6 +252,19 @@ insert into s1_values values
   ('accept_secret', (select result->>'secret' from shared));
 reset role;
 set local role service_role;
+insert into s1_values
+select
+  'accept_statement_pre',
+  public.broker_open_quote(
+    (select value::uuid from s1_values where key='accept_selector'),
+    (select value from s1_values where key='accept_secret'),
+    extensions.digest(convert_to('test-subject-accept-open','UTF8'),'sha256')
+  )#>>'{value,acceptance_statement}';
+select is(
+  (select value from s1_values where key='accept_statement_pre'),
+  'I accept this exact Tender quotation revision and acknowledge that the name and title provided are buyer-asserted.',
+  'open projection returns the database-owned version-1 acceptance statement'
+);
 select is((public.broker_accept_quote(
   (select value::uuid from s1_values where key='accept_selector'),
   (select value from s1_values where key='accept_secret'),
@@ -278,6 +293,11 @@ select is((select buyer_asserted_title from public.quote_acceptances where quote
   'Procurement Lead', 'acceptance freezes optional buyer-asserted title');
 select is((select acceptance_statement_version from public.quote_acceptances where quote_id=(select value::uuid from s1_values where key='quote_id')),
   1::smallint, 'acceptance statement version is exact');
+select is(
+  (select acceptance_statement from public.quote_acceptances where quote_id=(select value::uuid from s1_values where key='quote_id')),
+  (select value from s1_values where key='accept_statement_pre'),
+  'statement shown before acceptance equals statement stored after acceptance'
+);
 select is((select acceptance_statement_hash::text from public.quote_acceptances where quote_id=(select value::uuid from s1_values where key='quote_id')),
   (select public.sha256_hex(canonical_acceptance_statement) from public.quote_acceptances where quote_id=(select value::uuid from s1_values where key='quote_id')), 'acceptance statement hash covers exact canonical bytes');
 select is((select recipient_event_id from public.quote_acceptances where quote_id=(select value::uuid from s1_values where key='quote_id')),

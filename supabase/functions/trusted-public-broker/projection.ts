@@ -105,6 +105,9 @@ function openProjection(value: unknown): BuyerQuoteProjection {
   ) {
     throw new TypeError("open result response type is invalid.");
   }
+  if (row.acceptance_statement_version !== 1) {
+    throw new TypeError("open result acceptance statement version is invalid.");
+  }
   return {
     linkId: uuid(row.link_id, "link_id"),
     revisionId: uuid(row.revision_id, "revision_id"),
@@ -119,6 +122,12 @@ function openProjection(value: unknown): BuyerQuoteProjection {
     snapshot: row.snapshot,
     responseType,
     acceptanceAllowed: boolean(row.acceptance_allowed, "acceptance_allowed"),
+    acceptanceStatementVersion: 1,
+    acceptanceStatement: text(
+      row.acceptance_statement,
+      "acceptance_statement",
+      1_000,
+    ),
   } as BuyerQuoteProjection;
 }
 
