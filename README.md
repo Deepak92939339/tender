@@ -76,8 +76,10 @@ The intended deployment is Vercel for Next.js plus one dedicated Supabase projec
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `TENDER_DEMO_MODE=true` for the public invitation-only demo
+- `TENDER_EDGE_BROKER_TRANSPORT_SECRET` for the server-to-server public broker envelope
+- `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY` for the short-lived encrypted recipient session
 
-No service-role key or database URL is used by application runtime. The database URL is needed only in the operator's local environment for the deliberately invoked cloud demo-data command. No `vercel.json` is required for the current Next.js deployment. Full preparation, migration dry-run, Auth URL settings, smoke checks, and rollback assumptions are in [Deployment](docs/DEPLOYMENT.md).
+The two `TENDER_` values are server-only Next.js runtime values. No service-role key or database URL is used by Next.js or browser runtime. The isolated Supabase Edge broker alone receives the service-role credential for its four fixed RPC calls. The database URL is needed only in the operator's local environment for the deliberately invoked cloud demo-data command. No `vercel.json` is required for the current Next.js deployment. Full preparation, migration dry-run, Auth URL settings, smoke checks, and rollback assumptions are in [Deployment](docs/DEPLOYMENT.md).
 
 ## Current limitations
 

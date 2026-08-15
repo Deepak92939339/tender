@@ -4,7 +4,9 @@ Tender's primary boundaries are authenticated identity, organization membership,
 
 ## Runtime credentials
 
-The application uses only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`; both are designed for browser use and depend on RLS for safety. `TENDER_DEMO_MODE` is a non-secret server configuration flag. A service-role key and database URL must never be added to application runtime or browser code.
+Browser code uses only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`; both are designed for browser use and depend on RLS for safety. The Next.js runtime additionally holds only `TENDER_EDGE_BROKER_TRANSPORT_SECRET` and `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY`; neither grants database access. `TENDER_DEMO_MODE` is a non-secret server configuration flag. `SUPABASE_SERVICE_ROLE_KEY` and a database URL must never be added to Next.js or browser runtime.
+
+The isolated `trusted-public-broker` Supabase Edge Function is the sole runtime permitted to receive `SUPABASE_SERVICE_ROLE_KEY`. It authenticates the signed Next transport before using that credential for its four fixed broker RPCs; it must never be exposed through the browser, Next.js, build inputs, or logs.
 
 The guarded cloud demo command accepts a database URL only from the invoking operator's environment. It does not print or persist it, requires an allowlisted direct project host plus a repeated confirmation value, performs no truncation, and is not part of migration deployment.
 

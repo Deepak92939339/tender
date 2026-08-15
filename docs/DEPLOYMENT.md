@@ -54,7 +54,7 @@ Local, self-hosted, missing, multi-valued, or malformed address input becomes `u
 
 ### Capability session
 
-The same-origin session exchange stores only the selector, raw share secret, version, and a five-minute absolute expiry in an AES-256-GCM cookie. The cookie is `HttpOnly`, host-only, `SameSite=Strict`, `Secure` in production, and scoped to `/api/public-quotes`. It is not independent authority: every use is revalidated by the broker, so revoked, superseded, expired, accepted, or otherwise terminal link authority stops working immediately and causes the cookie to be cleared. The committed Stage 1 open projection does not expose the link's exact timestamp, so the browser cookie uses the short fixed storage lifetime while PostgreSQL enforces the exact earlier authority cutoff.
+The same-origin session exchange stores only the selector, raw share secret, version, and a five-minute absolute expiry in an AES-256-GCM cookie. The cookie is `HttpOnly`, host-only, `SameSite=Strict`, `Secure` in production, and scoped to `/api/public-quotes`. It is not independent authority: every use is revalidated by the broker, so revoked, superseded, expired, accepted, or otherwise terminal link authority stops working immediately and causes the cookie to be cleared. The committed Stage 1 open projection does not expose the link's exact timestamp, so the browser cookie uses the short fixed storage lifetime while PostgreSQL enforces the exact earlier authority cutoff. Current recipient document reloads require reopening the original fragment capability link; cookie-backed document restoration is a documented non-blocking follow-up.
 
 ## 5. Preflight and smoke test
 
@@ -65,8 +65,12 @@ Before deployment, run `npm ci`, `npm run verify`, and a production build with t
 3. Confirm unauthenticated `/quotes` and `/settings/organization` requests redirect with a safe local return target.
 4. Sign in with the privately held demo credential and inspect quotes, customers, catalog, approvals, and settings denial for the manager role.
 5. Open an issued quote and verify the issued-only print view and captured seller/customer snapshots.
-6. Attempt a direct Auth signup and confirm hosted Supabase rejects it.
-7. Review Vercel logs without recording credentials or database URLs.
+6. Open a newly created public capability link. Confirm its fragment is removed, the recipient document matches the issued snapshot, and no secret reaches the query string or browser storage.
+7. Confirm the exact database-projected acceptance statement appears before acceptance, record one acceptance, and replay its idempotency key without creating duplicate evidence.
+8. Verify a valid normalized verification code returns bounded public evidence and invalid codes do not reveal internal data.
+9. Confirm direct `anon` and `authenticated` calls to each broker RPC are denied, and an unsigned request to the Edge function returns `401` before database dispatch.
+10. Attempt a direct Auth signup and confirm hosted Supabase rejects it.
+11. Review Vercel and Edge logs without recording credentials, capability secrets, or database URLs.
 
 ## Rollback and recovery
 

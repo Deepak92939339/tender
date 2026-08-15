@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(88);
+select plan(98);
 
 select ok(not exists (
   select 1 from pg_constraint where conname in ('quotes_current_revision_fkey', 'quotes_accepted_revision_fkey') and not convalidated
@@ -84,14 +84,126 @@ select is((select snapshot_hash::text from public.quote_revisions where id=(sele
   (select public.sha256_hex(canonical_snapshot) from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id')), 'snapshot hash hashes exact canonical snapshot bytes');
 select is((select encode(canonical_snapshot, 'hex') from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id')),
   (select encode(public.canonical_json_v1(snapshot), 'hex') from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id')), 'stored snapshot bytes reproduce from canonical serializer');
+insert into s1_values values
+  ('sealed_snapshot_bytes_before_issue', (select encode(canonical_snapshot, 'hex') from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id'))),
+  ('sealed_snapshot_hash_before_issue', (select snapshot_hash::text from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id')));
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 select throws_ok($$update public.quote_revisions set snapshot_hash = repeat('0',64) where id=(select value::uuid from s1_values where key='revision_id')$$,
   '42501', null, 'authenticated caller cannot mutate revision authority');
+set local request.jwt.claims = '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}';
+select lives_ok($$
+  select public.update_organization_settings(
+    organization.id,
+    organization.version,
+    jsonb_build_object(
+      'name', organization.name,
+      'default_currency_code', organization.default_currency_code,
+      'default_locale', organization.default_locale,
+      'approval_threshold_bps', organization.approval_threshold_bps,
+      'seller_legal_name', 'Tender Demonstration Company Changed After Submission'
+    ),
+    'b1000000-0000-4000-8000-000000000099'
+  )
+  from public.organizations organization
+  where organization.id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+$$, 'supported seller-settings update succeeds after revision submission');
+select ok(
+  (select revision.snapshot#>>'{seller,legal_name}' is distinct from organization.seller_legal_name
+   from public.quote_revisions revision
+   join public.organizations organization on organization.id = revision.organization_id
+   where revision.id=(select value::uuid from s1_values where key='revision_id')),
+  'sealed revision seller identity remains distinct from changed live organization identity'
+);
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 select lives_ok($$select public.issue_quote_revision(
   (select value::uuid from s1_values where key='quote_id'),
   (select value::uuid from s1_values where key='revision_id'), 3,
   'b1000000-0000-4000-8000-000000000004')$$, 'approved revision issues');
+reset role;
+select is(
+  (select encode(canonical_snapshot, 'hex') from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id')),
+  (select value from s1_values where key='sealed_snapshot_bytes_before_issue'),
+  'issuance preserves the sealed canonical revision bytes after seller-settings change'
+);
+select is(
+  (select snapshot_hash::text from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id')),
+  (select value from s1_values where key='sealed_snapshot_hash_before_issue'),
+  'issuance preserves the sealed revision hash after seller-settings change'
+);
+select is(
+  (
+    select jsonb_build_object(
+      'legal_name', quote.seller_legal_name_snapshot,
+      'address_line1', quote.seller_address_line1_snapshot,
+      'address_line2', coalesce(quote.seller_address_line2_snapshot, ''),
+      'city', quote.seller_city_snapshot,
+      'region', coalesce(quote.seller_region_snapshot, ''),
+      'postal_code', coalesce(quote.seller_postal_code_snapshot, ''),
+      'country_code', quote.seller_country_code_snapshot,
+      'tax_identifier', quote.seller_tax_identifier_snapshot,
+      'contact_email', quote.seller_contact_email_snapshot,
+      'contact_phone', quote.seller_contact_phone_snapshot
+    )::text
+    from public.quotes quote
+    where quote.id=(select value::uuid from s1_values where key='quote_id')
+  ),
+  (select snapshot->'seller' from public.quote_revisions where id=(select value::uuid from s1_values where key='revision_id'))::text,
+  'authenticated issued-print seller snapshot equals the sealed revision seller identity'
+);
+insert into s1_values values (
+  'authenticated_issued_seller_document',
+  (
+    select jsonb_build_object(
+      'legal_name', quote.seller_legal_name_snapshot,
+      'address_line1', quote.seller_address_line1_snapshot,
+      'address_line2', coalesce(quote.seller_address_line2_snapshot, ''),
+      'city', quote.seller_city_snapshot,
+      'region', coalesce(quote.seller_region_snapshot, ''),
+      'postal_code', coalesce(quote.seller_postal_code_snapshot, ''),
+      'country_code', quote.seller_country_code_snapshot,
+      'tax_identifier', quote.seller_tax_identifier_snapshot,
+      'contact_email', quote.seller_contact_email_snapshot,
+      'contact_phone', quote.seller_contact_phone_snapshot
+    )::text
+    from public.quotes quote
+    where quote.id=(select value::uuid from s1_values where key='quote_id')
+  )
+);
+select ok(
+  (
+    select jsonb_build_object(
+      'legal_name', quote.seller_legal_name_snapshot,
+      'address_line1', quote.seller_address_line1_snapshot,
+      'address_line2', coalesce(quote.seller_address_line2_snapshot, ''),
+      'city', quote.seller_city_snapshot,
+      'region', coalesce(quote.seller_region_snapshot, ''),
+      'postal_code', coalesce(quote.seller_postal_code_snapshot, ''),
+      'country_code', quote.seller_country_code_snapshot,
+      'tax_identifier', quote.seller_tax_identifier_snapshot,
+      'contact_email', quote.seller_contact_email_snapshot,
+      'contact_phone', quote.seller_contact_phone_snapshot
+    ) is distinct from jsonb_build_object(
+      'legal_name', organization.seller_legal_name,
+      'address_line1', organization.seller_address_line1,
+      'address_line2', coalesce(organization.seller_address_line2, ''),
+      'city', organization.seller_city,
+      'region', coalesce(organization.seller_region, ''),
+      'postal_code', coalesce(organization.seller_postal_code, ''),
+      'country_code', organization.seller_country_code,
+      'tax_identifier', organization.seller_tax_identifier,
+      'contact_email', organization.seller_contact_email,
+      'contact_phone', organization.seller_contact_phone
+    )
+    from public.quotes quote
+    join public.organizations organization on organization.id = quote.organization_id
+    where quote.id=(select value::uuid from s1_values where key='quote_id')
+  ),
+  'authenticated issued-print seller snapshot does not use changed live organization identity'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 
 with shared as (
   select public.create_quote_share_link(
@@ -167,6 +279,13 @@ set local role service_role;
 select is((public.broker_open_quote(
   (select value::uuid from s1_values where key='selector'), (select value from s1_values where key='secret'),
   extensions.digest(convert_to('test-subject-open','UTF8'),'sha256'))->>'status'), 'ok', 'service broker opens a valid issued revision');
+select is(
+  (public.broker_open_quote(
+    (select value::uuid from s1_values where key='selector'), (select value from s1_values where key='secret'),
+    extensions.digest(convert_to('test-subject-open-seller','UTF8'),'sha256'))#>'{value,snapshot,seller}')::text,
+  (select value from s1_values where key='authenticated_issued_seller_document'),
+  'broker recipient projection seller identity matches authenticated issued-print seller snapshot'
+);
 select is((public.broker_open_quote(
   (select value::uuid from s1_values where key='selector'), 'wrong-secret',
   extensions.digest(convert_to('test-subject-wrong','UTF8'),'sha256'))->>'status'), 'invalid_link', 'wrong token reveals no link state');
@@ -304,6 +423,57 @@ select is((select recipient_event_id from public.quote_acceptances where quote_i
   (select id from public.quote_recipient_events where revision_id=(select value::uuid from s1_values where key='successor_revision_id') and event_type='accepted'), 'acceptance binds its originating terminal event');
 select throws_ok($$update public.quote_acceptances set buyer_asserted_name='Changed' where quote_id=(select value::uuid from s1_values where key='quote_id')$$,
   '55000', 'quote_acceptance_immutable', 'acceptance evidence is immutable');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+with invalid_seller as (
+  select public.create_verified_quote_draft(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a3000000-0000-4000-8000-000000000001',
+    'INR', 'en-IN', 'GST 18%', 'exclusive', '2026-08-14', '2026-09-14',
+    'b1000000-0000-4000-8000-000000000081'
+  ) result
+)
+insert into s1_values values
+  ('invalid_seller_quote_id', (select result->>'id' from invalid_seller)),
+  ('invalid_seller_revision_id', (select result->>'current_revision_id' from invalid_seller));
+select lives_ok($$select public.save_quote_draft(
+  (select value::uuid from s1_values where key='invalid_seller_quote_id'), 1,
+  'b1000000-0000-4000-8000-000000000082',
+  jsonb_build_object(
+    'customer_id', 'a3000000-0000-4000-8000-000000000001', 'currency_code', 'INR',
+    'locale', 'en-IN', 'tax_label', 'GST 18%', 'tax_mode', 'exclusive',
+    'discount_bps', 0, 'issue_date', '2026-08-14', 'valid_until', '2026-09-14',
+    'notes', 'Invalid sealed seller structure test', 'items', jsonb_build_array(jsonb_build_object(
+      'line_id', null, 'product_id', 'a2000000-0000-4000-8000-000000000001',
+      'position', 1, 'quantity_scaled', 1, 'quantity_scale', 1
+    )), 'charges', '[]'::jsonb
+  ))$$, 'invalid-seller regression draft prepares through the existing calculator boundary');
+select lives_ok($$select public.submit_quote_revision(
+  (select value::uuid from s1_values where key='invalid_seller_quote_id'),
+  (select value::uuid from s1_values where key='invalid_seller_revision_id'), 2,
+  'b1000000-0000-4000-8000-000000000083')$$, 'invalid-seller regression revision seals before corruption');
+reset role;
+alter table public.quote_revisions disable trigger quote_revisions_authority_immutable;
+with invalid_snapshot as (
+  select revision.id,
+    jsonb_set(revision.snapshot, '{seller}', (revision.snapshot -> 'seller') - 'contact_phone') snapshot
+  from public.quote_revisions revision
+  where revision.id=(select value::uuid from s1_values where key='invalid_seller_revision_id')
+)
+update public.quote_revisions revision
+set snapshot = invalid_snapshot.snapshot,
+  canonical_snapshot = public.canonical_json_v1(invalid_snapshot.snapshot),
+  snapshot_hash = public.sha256_hex(public.canonical_json_v1(invalid_snapshot.snapshot))
+from invalid_snapshot
+where revision.id = invalid_snapshot.id;
+alter table public.quote_revisions enable trigger quote_revisions_authority_immutable;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
+select throws_ok($$select public.issue_quote_revision(
+  (select value::uuid from s1_values where key='invalid_seller_quote_id'),
+  (select value::uuid from s1_values where key='invalid_seller_revision_id'), 3,
+  'b1000000-0000-4000-8000-000000000084')$$,
+  '55000', 'sealed_seller_snapshot_invalid', 'issuance fails safely when the required sealed seller structure is missing');
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
