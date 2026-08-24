@@ -33,7 +33,7 @@ Set these runtime variables for Production (and Preview only if previews should 
 - `TENDER_EDGE_BROKER_TRANSPORT_SECRET`
 - `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY`
 
-The two `TENDER_` values are server-only. The transport secret authenticates only the fixed Next-to-Edge broker envelope and does not grant database access. The session key encrypts and authenticates the short-lived capability cookie. Do not expose either with a `NEXT_PUBLIC_` prefix. Do not add `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, or `PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET` to Vercel.
+The transport and session secrets are server-only; `TENDER_DEMO_MODE` is a server-only non-secret flag. The transport secret authenticates only the fixed Next-to-Edge broker envelope and does not grant database access. The session key encrypts and authenticates the short-lived capability cookie. Do not expose either secret with a `NEXT_PUBLIC_` prefix. Do not add `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, or `PUBLIC_BROKER_RATE_LIMIT_HMAC_SECRET` to Vercel.
 
 ## 4. Isolated public broker Edge Function
 

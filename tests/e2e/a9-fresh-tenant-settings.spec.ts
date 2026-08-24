@@ -417,13 +417,18 @@ test("fresh_tenant_end_to_end", async ({ page }) => {
   ).toContainText("Archived", { ignoreCase: true });
 
   await page.goto("/catalog");
-  const productRow = page.getByRole("row").filter({
-    has: page.getByRole("cell", { name: productSku, exact: true }),
+  const catalogTable = page
+    .getByRole("region", { name: "Catalog table", exact: true })
+    .getByRole("table");
+  const productRow = catalogTable.getByRole("row").filter({
+    hasText: productSku,
   });
   await expect(productRow).toHaveCount(1);
-  await expect(
-    productRow.getByRole("cell", { name: "NO_TAX", exact: true }),
-  ).toHaveCount(1);
+  const productCells = productRow.getByRole("cell");
+  // Mobile cards retain useful generated field labels (for example, "SKU") in
+  // their accessible names. Business-data checks intentionally target DOM text.
+  await expect(productCells.nth(0)).toHaveText(productSku);
+  await expect(productCells.nth(4)).toHaveText("NO_TAX");
 
   await openNamedDisclosure(page, "Create product");
   const nextProductForm = page.locator("form.record-form").filter({

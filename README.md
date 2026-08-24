@@ -4,6 +4,10 @@ Tender is a multi-tenant commercial quotation application for preparing priced o
 
 > Live demo: **not deployed yet** — add the production URL here after the first verified deployment.
 
+## Release-candidate status
+
+The current public-release candidate is local only: branch `feat/issuer-share-link-ui`, checkpoint `4f8686e60f976769dd154fee2eea226ebf7bcfc0`. No Supabase project or Vercel deployment has been created or changed from this repository state. The application currently has 13 App Router pages, 29 ordered migrations, 23 pgTAP files, 22 unit-test files, and 22 Playwright spec files.
+
 ## What it demonstrates
 
 - Authenticated organizations with role/capability checks and tenant-scoped row-level security (RLS).
@@ -11,6 +15,7 @@ Tender is a multi-tenant commercial quotation application for preparing priced o
 - Integer minor-unit money, basis-point rates, and scaled integer quantities.
 - Optimistic concurrency, idempotent command receipts, immutable submission/issuance snapshots, and append-only quote activity.
 - Exact parity checks between the PostgreSQL commercial calculator and the TypeScript preview calculator.
+- Issuer controls to create, list, and revoke recipient capability links for issued revisions; recipients see only the authorized public projection and recorded acceptance evidence.
 
 ## Architecture
 
@@ -44,15 +49,15 @@ Run the complete gate only against the repository's disposable local Supabase pr
 npm run verify
 ```
 
-The gate resets the local database, applies migrations and the local seed, runs pgTAP, regenerates database types, runs lint, typecheck, unit, 5,000 deterministic parity cases, two concurrency runners, a production build, Playwright, and tracked/client-asset secret scans. A fresh public-candidate run observed:
+The complete local gate resets the disposable database, applies migrations and the local seed, runs pgTAP, regenerates database types, runs lint, typecheck, unit and parity checks, concurrency runners, a production build, bounded Playwright shards, and tracked/client-asset secret scans. The final Stage 3 public-candidate evidence recorded:
 
-- Unit: **44 passed across 11 files**
-- pgTAP: **522 passed across 21 files**
-- Parity: **5,000 deterministic cases matched exactly**
-- Concurrency: **40 unique concurrent quote numbers; one-winner approval decision**
-- Playwright: **62 passed, 4 skipped, 66 collected across desktop and mobile projects**
-- Production build: **passed; 13 App Router routes plus middleware**
-- Secret scan: **157 tracked/untracked candidate text files and 23 built client assets passed**
+- Unit: **156/156 passed across 22 files**
+- pgTAP: **23 files, 642 assertions passed**
+- Calculator parity: **5,000/5,000 deterministic cases matched exactly**
+- Concurrency: **40/40 unique quote numbers; one-winner approval decision; commitment races passed**
+- Playwright: **all 96 desktop/mobile assignments covered sequentially; 87 passed and 9 intentional project skips**
+- Production build: **passed with 13 App Router pages; formatting, ESLint, and TypeScript passed**
+- Security and UX: **signed transport, secret scans, clean-demo isolation, and authenticated responsive audit passed**
 
 Individual checks are available as `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test:unit`, `npm run test:auth`, `npm run test:db`, `npm run test:parity`, `npm run test:concurrency`, `npm run test:decisions`, `npm run build`, `npm run test:e2e`, and `npm run test:secrets`.
 
@@ -79,7 +84,7 @@ The intended deployment is Vercel for Next.js plus one dedicated Supabase projec
 - `TENDER_EDGE_BROKER_TRANSPORT_SECRET` for the server-to-server public broker envelope
 - `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY` for the short-lived encrypted recipient session
 
-The two `TENDER_` values are server-only Next.js runtime values. No service-role key or database URL is used by Next.js or browser runtime. The isolated Supabase Edge broker alone receives the service-role credential for its four fixed RPC calls. The database URL is needed only in the operator's local environment for the deliberately invoked cloud demo-data command. No `vercel.json` is required for the current Next.js deployment. Full preparation, migration dry-run, Auth URL settings, smoke checks, and rollback assumptions are in [Deployment](docs/DEPLOYMENT.md).
+The transport and session secrets are server-only Next.js runtime values; `TENDER_DEMO_MODE` is a server-only non-secret flag. No service-role key or database URL is used by Next.js or browser runtime. The isolated Supabase Edge broker alone receives the service-role credential for its four fixed RPC calls. The database URL is needed only in the operator's local environment for the deliberately invoked cloud demo-data command. No `vercel.json` is required for the current Next.js deployment. Full preparation, migration dry-run, Auth URL settings, smoke checks, and rollback assumptions are in [Deployment](docs/DEPLOYMENT.md).
 
 ## Current limitations
 
@@ -88,6 +93,10 @@ The two `TENDER_` values are server-only Next.js runtime values. No service-role
 - There is no email delivery, generated immutable PDF asset, outbox, retry/DLQ, webhook automation, or external integration layer.
 - The demo has one active organization context per user and no membership administration UI.
 - Signup mode is deployment configuration; changing it requires a rebuild/redeploy.
+- Migrations are forward-only: rollback is a forward fix or a backup-and-restore/recreated-demo decision, not a down-migration command.
+- Command receipts retain command payload/result evidence until an operator adopts and documents a retention policy.
+- `tax_profiles.price_basis` remains a deprecated compatibility field; quote calculations use the saved quote tax mode and line snapshots.
+- Some command functions intentionally lock their aggregate before later authorization/state guards, so rejected contenders can briefly wait rather than bypass serialization.
 - Cloud deployment and independent penetration testing have not yet occurred.
 
 ## Repository map
@@ -108,6 +117,8 @@ The two `TENDER_` values are server-only Next.js runtime values. No service-role
 ## Security and advisories
 
 This repository is a demonstration application and has not been independently penetration-tested. Do not use it for real commercial or personal data without a separate security, privacy, tax, and operational review. After publication, report suspected vulnerabilities through a private GitHub Security Advisory rather than a public issue. Dependency advisory results are reported from the final local release verification and should not be interpreted as proof that every transitive package is unreachable.
+
+Stage 4 updated the direct Next.js and matching ESLint integration to `16.3.2`, with normal compatible lockfile updates for PostCSS, Sharp, Nanoid, js-yaml, and undici. The final read-only `npm audit --omit=dev` and full `npm audit` both reported **zero vulnerabilities**. This result is point-in-time evidence, not a substitute for reviewing future advisories before deployment.
 
 ## Contributing and license
 
