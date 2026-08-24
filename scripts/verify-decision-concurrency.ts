@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,13 +9,16 @@ if (!url || !key)
 const supabase = createClient(url, key, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+const issueDate = new Date().toISOString().slice(0, 10);
+const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000)
+  .toISOString()
+  .slice(0, 10);
 let response = await supabase.auth.signInWithPassword({
   email: "operator@tender.local",
   password: "TenderLocal1!",
 });
 if (response.error) throw response.error;
-const command = (suffix: number) =>
-  `a7000000-0000-4000-8000-${String(suffix).padStart(12, "0")}`;
+const command = () => randomUUID();
 const created = await supabase.rpc("create_quote_draft", {
   p_organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   p_customer_id: "a3000000-0000-4000-8000-000000000001",
@@ -22,16 +26,16 @@ const created = await supabase.rpc("create_quote_draft", {
   p_locale: "en-IN",
   p_tax_label: "GST 18%",
   p_tax_mode: "exclusive",
-  p_issue_date: "2026-07-22",
-  p_valid_until: "2026-08-22",
-  p_command_id: command(1),
+  p_issue_date: issueDate,
+  p_valid_until: validUntil,
+  p_command_id: command(),
 });
 if (created.error) throw created.error;
 const quote = created.data as { id: string; version: number };
 const saved = await supabase.rpc("save_quote_draft", {
   p_quote_id: quote.id,
   p_expected_version: quote.version,
-  p_command_id: command(2),
+  p_command_id: command(),
   p_payload: {
     customer_id: "a3000000-0000-4000-8000-000000000001",
     currency_code: "INR",
@@ -39,8 +43,8 @@ const saved = await supabase.rpc("save_quote_draft", {
     tax_label: "GST 18%",
     tax_mode: "exclusive",
     discount_bps: 1200,
-    issue_date: "2026-07-22",
-    valid_until: "2026-08-22",
+    issue_date: issueDate,
+    valid_until: validUntil,
     notes: "",
     items: [
       {
@@ -58,7 +62,7 @@ if (saved.error) throw saved.error;
 const submitted = await supabase.rpc("submit_quote", {
   p_quote_id: quote.id,
   p_expected_version: 2,
-  p_command_id: command(3),
+  p_command_id: command(),
 });
 if (submitted.error) throw submitted.error;
 
@@ -71,12 +75,12 @@ const decisions = await Promise.all([
   supabase.rpc("approve_quote", {
     p_quote_id: quote.id,
     p_expected_version: 3,
-    p_command_id: command(4),
+    p_command_id: command(),
   }),
   supabase.rpc("approve_quote", {
     p_quote_id: quote.id,
     p_expected_version: 3,
-    p_command_id: command(5),
+    p_command_id: command(),
   }),
 ]);
 assert.equal(

@@ -29,6 +29,7 @@
     "test:decisions": "node --env-file=.env.local --experimental-strip-types scripts/verify-decision-concurrency.ts",
     "test:secrets": "node scripts/verify-secrets.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:isolation": "node --experimental-strip-types scripts/verify-e2e-data-isolation.ts",
     "test:e2e:headed": "playwright test --headed",
     "verify": "node scripts/verify.mjs",
     "db:start": "supabase start",

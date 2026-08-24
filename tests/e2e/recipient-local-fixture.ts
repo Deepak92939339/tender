@@ -3,6 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { waitForLocalSupabaseReadiness } from "./local-readiness.ts";
 
 const project = "tender-local-visual-study";
 const container = `supabase_db_${project}`;
@@ -267,6 +268,7 @@ commit;`);
 async function serveRecipientE2E() {
   assertLocalTarget();
   const { apiUrl, anonKey } = localRuntime();
+  await waitForLocalSupabaseReadiness(apiUrl, anonKey);
   const transportSecret = randomBytes(48).toString("base64url");
   const sessionSecret = randomBytes(48).toString("base64url");
   const rateSecret = randomBytes(48).toString("base64url");

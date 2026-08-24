@@ -7,6 +7,36 @@ select has_column('public', 'command_receipts', 'scope_type', 'receipts declare 
 select has_column('public', 'command_receipts', 'scope_id', 'receipts declare their user or organization scope');
 select has_column('public', 'command_receipts', 'request_hash', 'receipts retain a canonical command request hash');
 
+create or replace function pg_temp.receipt_payload(
+  p_issue_date date,
+  p_valid_until date,
+  p_notes text,
+  p_quantity_scaled integer default 1
+)
+returns jsonb
+language sql
+as $$
+  select jsonb_build_object(
+    'customer_id', 'a3000000-0000-4000-8000-000000000001',
+    'currency_code', 'INR',
+    'locale', 'en-IN',
+    'tax_label', 'GST',
+    'tax_mode', 'exclusive',
+    'discount_bps', 0,
+    'issue_date', p_issue_date,
+    'valid_until', p_valid_until,
+    'notes', p_notes,
+    'items', jsonb_build_array(jsonb_build_object(
+      'line_id', null,
+      'product_id', 'a2000000-0000-4000-8000-000000000001',
+      'position', 1,
+      'quantity_scaled', p_quantity_scaled,
+      'quantity_scale', 1
+    )),
+    'charges', '[]'::jsonb
+  )
+$$;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}';
 
@@ -62,8 +92,8 @@ select lives_ok(
     'en-IN',
     'GST',
     'exclusive',
-    '2026-07-23',
-    '2026-08-23',
+    current_date,
+    current_date + 30,
     'c2000000-0000-4000-8000-000000000010'
   )$$,
   'organization-scoped quote creation records its command'
@@ -76,8 +106,8 @@ select throws_ok(
     'de-DE',
     'VAT',
     'inclusive',
-    '2026-07-23',
-    '2026-09-23',
+    current_date,
+    current_date + 60,
     'c2000000-0000-4000-8000-000000000010'
   )$$,
   '22023',
@@ -90,7 +120,7 @@ select id, number, version
 from public.quotes
 where organization_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   and created_by = auth.uid()
-  and issue_date = '2026-07-23'
+  and issue_date = current_date
 order by created_at desc
 limit 1;
 
@@ -99,7 +129,7 @@ select lives_ok(
     (select id from receipt_quotes limit 1),
     1,
     'c2000000-0000-4000-8000-000000000011',
-    '{"customer_id":"a3000000-0000-4000-8000-000000000001","currency_code":"INR","locale":"en-IN","tax_label":"GST","tax_mode":"exclusive","discount_bps":0,"issue_date":"2026-07-23","valid_until":"2026-08-23","notes":"Receipt stable","items":[{"line_id":null,"product_id":"a2000000-0000-4000-8000-000000000001","position":1,"quantity_scaled":1,"quantity_scale":1}],"charges":[]}'::jsonb
+    pg_temp.receipt_payload(current_date, current_date + 30, 'Receipt stable')
   )$$,
   'organization-scoped draft save records its command'
 );
@@ -109,7 +139,7 @@ select is(
       (select id from receipt_quotes limit 1),
       1,
       'c2000000-0000-4000-8000-000000000011',
-      '{"customer_id":"a3000000-0000-4000-8000-000000000001","currency_code":"INR","locale":"en-IN","tax_label":"GST","tax_mode":"exclusive","discount_bps":0,"issue_date":"2026-07-23","valid_until":"2026-08-23","notes":"Receipt stable","items":[{"line_id":null,"product_id":"a2000000-0000-4000-8000-000000000001","position":1,"quantity_scaled":1,"quantity_scale":1}],"charges":[]}'::jsonb
+      pg_temp.receipt_payload(current_date, current_date + 30, 'Receipt stable')
     ) ->> 'version'
   )::integer,
   2,
@@ -120,7 +150,7 @@ select throws_ok(
     (select id from receipt_quotes limit 1),
     1,
     'c2000000-0000-4000-8000-000000000011',
-    '{"customer_id":"a3000000-0000-4000-8000-000000000001","currency_code":"INR","locale":"en-IN","tax_label":"GST","tax_mode":"exclusive","discount_bps":0,"issue_date":"2026-07-23","valid_until":"2026-08-23","notes":"Changed command meaning","items":[{"line_id":null,"product_id":"a2000000-0000-4000-8000-000000000001","position":1,"quantity_scaled":2,"quantity_scale":1}],"charges":[]}'::jsonb
+    pg_temp.receipt_payload(current_date, current_date + 30, 'Changed command meaning', 2)
   )$$,
   '22023',
   'command_id_collision',
@@ -135,8 +165,8 @@ select lives_ok(
     'en-IN',
     'GST',
     'exclusive',
-    '2026-07-24',
-    '2026-08-24',
+    current_date + 1,
+    current_date + 31,
     'c2000000-0000-4000-8000-000000000012'
   )$$,
   'a second quote is available for aggregate-collision proof'
@@ -147,7 +177,7 @@ select id, number, version
 from public.quotes
 where organization_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   and created_by = auth.uid()
-  and issue_date = '2026-07-24'
+  and issue_date = current_date + 1
 order by created_at desc
 limit 1;
 
@@ -156,7 +186,7 @@ select lives_ok(
     (select id from receipt_quotes where version = 1 order by number desc limit 1),
     1,
     'c2000000-0000-4000-8000-000000000013',
-    '{"customer_id":"a3000000-0000-4000-8000-000000000001","currency_code":"INR","locale":"en-IN","tax_label":"GST","tax_mode":"exclusive","discount_bps":0,"issue_date":"2026-07-24","valid_until":"2026-08-24","notes":"","items":[{"line_id":null,"product_id":"a2000000-0000-4000-8000-000000000001","position":1,"quantity_scaled":1,"quantity_scale":1}],"charges":[]}'::jsonb
+    pg_temp.receipt_payload(current_date + 1, current_date + 31, '')
   )$$,
   'the second quote is prepared'
 );

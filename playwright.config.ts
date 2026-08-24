@@ -7,6 +7,7 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 15_000 },
   retries: 0,
+  globalTeardown: "./tests/e2e/local-cleanup.ts",
   reporter: "line",
   use: {
     baseURL: "http://localhost:3000",
