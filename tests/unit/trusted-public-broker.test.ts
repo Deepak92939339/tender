@@ -20,7 +20,7 @@ import {
 
 const selector = "10000000-0000-4000-8000-000000000001";
 const idempotencyKey = "20000000-0000-4000-8000-000000000001";
-const secret = "a".repeat(43);
+const secret = "A".repeat(43);
 const hmacSecret = "local-unit-test-material-with-at-least-32-bytes";
 const hash = "a".repeat(64);
 const timestamp = "2026-08-14T12:00:00Z";
@@ -226,6 +226,14 @@ describe("trusted public broker request boundary", () => {
   it.each([
     ["selector", { action: "open", selector: "not-a-uuid", secret }],
     ["secret", { action: "open", selector, secret: "too-short" }],
+    [
+      "non-canonical secret",
+      {
+        action: "open",
+        selector,
+        secret: `${secret.slice(0, -1)}B`,
+      },
+    ],
     [
       "idempotency key",
       {

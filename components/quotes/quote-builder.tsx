@@ -9,6 +9,7 @@ import {
   type QuoteDraftProjection,
 } from "@/app/(application)/quotes/actions";
 import {
+  calculateExtendedLineAmountMinor,
   calculateQuote,
   type ChargeType,
   type QuoteCalculationInput,
@@ -1036,7 +1037,12 @@ export function QuoteBuilder({
                         <td className="money">
                           {calculated
                             ? formatMinor(
-                                calculated.line_total_minor,
+                                calculateExtendedLineAmountMinor({
+                                  unitPriceMinor:
+                                    calculated.unit_price_minor_snapshot,
+                                  quantityScaled: calculated.quantity_scaled,
+                                  quantityScale: calculated.quantity_scale,
+                                }),
                                 currencyCode,
                                 locale,
                               )

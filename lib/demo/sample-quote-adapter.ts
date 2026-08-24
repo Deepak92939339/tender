@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+  calculateExtendedLineAmountMinor,
   calculateQuote,
+  calculateTaxAmountMinor,
   type QuoteCalculationInput,
   type UnitCode,
 } from "@/lib/quotes/calculate";
@@ -135,14 +137,10 @@ function quantity(value: string, unit: UnitCode) {
 }
 
 function taxRateFor(state: SampleQuoteState, itemRate: string) {
-  if (
-    state.taxPresentation === "export-zero" ||
-    state.taxPresentation === "us-none"
-  )
-    return 0;
-  const rate = asMinor(itemRate, "INR", "Tax rate");
-  if (rate > 10_000) throw new RangeError("Tax rate cannot exceed 100%.");
-  return rate;
+  return taxComponentDefinitions(state.taxPresentation, itemRate).reduce(
+    (total, component) => total + component.rateBps,
+    0,
+  );
 }
 
 export function sampleQuoteInput(
@@ -188,7 +186,68 @@ export function sampleQuoteInput(
 }
 
 export function calculateSampleQuote(state: SampleQuoteState) {
-  return calculateQuote(sampleQuoteInput(state));
+  const input = sampleQuoteInput(state);
+  const calculated = calculateQuote(input);
+  const components = new Map<string, SampleTaxComponent>();
+  let taxableBaseMinor = 0;
+  let itemTaxMinor = 0;
+  const items = calculated.items.map((item, index) => {
+    const definitions = taxComponentDefinitions(
+      state.taxPresentation,
+      state.items[index]?.taxRate ?? "0",
+    );
+    const amounts = componentAmountsForItem(
+      item.net_minor,
+      item.tax_minor,
+      input.tax_mode,
+      definitions,
+    );
+    const structuralTaxMinor = amounts.reduce(
+      (total, amount) => total + amount,
+      0,
+    );
+    taxableBaseMinor += item.net_minor;
+    itemTaxMinor += structuralTaxMinor;
+    definitions.forEach((definition, componentIndex) => {
+      const key = `${definition.label}:${definition.rateBps}`;
+      const existing = components.get(key);
+      components.set(key, {
+        ...definition,
+        taxableBaseMinor: (existing?.taxableBaseMinor ?? 0) + item.net_minor,
+        amountMinor: (existing?.amountMinor ?? 0) + amounts[componentIndex]!,
+      });
+    });
+    return {
+      ...item,
+      tax_minor: structuralTaxMinor,
+      line_total_minor:
+        input.tax_mode === "exclusive"
+          ? item.net_minor + structuralTaxMinor
+          : item.line_total_minor,
+      extended_line_amount_minor: calculateExtendedLineAmountMinor({
+        unitPriceMinor: item.unit_price_minor_snapshot,
+        quantityScaled: item.quantity_scaled,
+        quantityScale: item.quantity_scale,
+      }),
+    };
+  });
+  const totalMinor =
+    calculated.subtotal_minor -
+    calculated.discount_minor +
+    itemTaxMinor +
+    calculated.charge_net_minor +
+    calculated.charge_tax_minor;
+  if (![taxableBaseMinor, itemTaxMinor, totalMinor].every(Number.isSafeInteger))
+    throw new RangeError("Sample calculation exceeds the safe integer range.");
+  return {
+    ...calculated,
+    items,
+    taxable_base_minor: taxableBaseMinor,
+    tax_components: [...components.values()],
+    item_tax_minor: itemTaxMinor,
+    tax_minor: itemTaxMinor + calculated.charge_tax_minor,
+    total_minor: totalMinor,
+  };
 }
 
 export function taxPresentationOptions(marketId: SampleQuoteState["marketId"]) {
@@ -223,24 +282,127 @@ export function taxPresentationOptions(marketId: SampleQuoteState["marketId"]) {
   }
 }
 
-export function taxLabels(presentation: TaxPresentation, rate: string) {
+type TaxComponentDefinition = { label: string; rateBps: number };
+
+export type SampleTaxComponent = TaxComponentDefinition & {
+  taxableBaseMinor: number;
+  amountMinor: number;
+};
+
+function ratePercent(rateBps: number) {
+  const whole = Math.floor(rateBps / 100);
+  const fractional = rateBps % 100;
+  return fractional === 0
+    ? `${whole}`
+    : `${whole}.${fractional.toString().padStart(2, "0").replace(/0$/, "")}`;
+}
+
+export function taxComponentDefinitions(
+  presentation: TaxPresentation,
+  rate: string,
+): TaxComponentDefinition[] {
+  if (presentation === "export-zero" || presentation === "us-none") return [];
+  if (presentation === "canada-on")
+    return [{ label: "HST 13%", rateBps: 1300 }];
+  if (presentation === "canada-bc")
+    return [
+      { label: "GST 5%", rateBps: 500 },
+      { label: "PST 7%", rateBps: 700 },
+    ];
+  const parsedRate = asMinor(rate, "INR", "Tax rate");
+  if (parsedRate > 10_000) throw new RangeError("Tax rate cannot exceed 100%.");
   switch (presentation) {
-    case "india-intra":
+    case "india-intra": {
+      if (parsedRate % 2 !== 0)
+        throw new RangeError(
+          "Intra-state GST must split into equal whole basis-point rates.",
+        );
+      const componentRate = parsedRate / 2;
       return [
-        `CGST ${(Number(rate) / 2).toString()}%`,
-        `SGST ${(Number(rate) / 2).toString()}%`,
+        {
+          label: `CGST ${ratePercent(componentRate)}%`,
+          rateBps: componentRate,
+        },
+        {
+          label: `SGST ${ratePercent(componentRate)}%`,
+          rateBps: componentRate,
+        },
       ];
+    }
     case "india-inter":
-      return [`IGST ${rate}%`];
-    case "canada-on":
-      return [`HST ${rate}%`];
-    case "canada-bc":
-      return ["GST 5%", "PST 7%"];
+      return [
+        { label: `IGST ${ratePercent(parsedRate)}%`, rateBps: parsedRate },
+      ];
     case "kuwait-vat":
-      return [`VAT ${rate}%`];
+      return [
+        { label: `VAT ${ratePercent(parsedRate)}%`, rateBps: parsedRate },
+      ];
     case "japan-consumption":
-      return [`Consumption tax ${rate}%`];
+      return [
+        {
+          label: `Consumption tax ${ratePercent(parsedRate)}%`,
+          rateBps: parsedRate,
+        },
+      ];
     default:
       return [];
   }
+}
+
+function componentAmountsForItem(
+  taxableBaseMinor: number,
+  authoritativeTaxMinor: number,
+  taxMode: "exclusive" | "inclusive",
+  definitions: TaxComponentDefinition[],
+) {
+  if (taxMode === "exclusive")
+    return definitions.map(({ rateBps }) =>
+      calculateTaxAmountMinor(taxableBaseMinor, rateBps),
+    );
+  if (definitions.length === 0) return [];
+  const base = BigInt(taxableBaseMinor);
+  const floors = definitions.map(({ rateBps }) =>
+    Number((base * BigInt(rateBps)) / 10_000n),
+  );
+  let remaining = authoritativeTaxMinor - floors.reduce((a, b) => a + b, 0);
+  const allocationOrder = definitions
+    .map(({ rateBps }, index) => ({
+      index,
+      remainder: Number((base * BigInt(rateBps)) % 10_000n),
+      rateBps,
+    }))
+    .sort(
+      (left, right) =>
+        right.remainder - left.remainder ||
+        right.rateBps - left.rateBps ||
+        left.index - right.index,
+    );
+  for (let index = 0; remaining > 0; index += 1, remaining -= 1) {
+    floors[allocationOrder[index % allocationOrder.length]!.index]! += 1;
+  }
+  if (remaining < 0)
+    throw new RangeError("Inclusive tax component allocation is invalid.");
+  return floors;
+}
+
+export function displayedTaxRate(
+  presentation: TaxPresentation,
+  itemRate: string,
+) {
+  if (presentation === "canada-on") return "13";
+  if (presentation === "canada-bc") return "12";
+  if (presentation === "export-zero" || presentation === "us-none") return "0";
+  return itemRate;
+}
+
+export function taxRateIsFixed(presentation: TaxPresentation) {
+  return ["canada-on", "canada-bc", "export-zero", "us-none"].includes(
+    presentation,
+  );
+}
+
+export function taxLabels(presentation: TaxPresentation, rate: string) {
+  return taxComponentDefinitions(presentation, rate).map(
+    (component) => component.label,
+  );
 }

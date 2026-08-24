@@ -32,3 +32,5 @@ supabase/.temp/
 
 # Ad hoc QA runs (unverified scripts/artifacts, not part of the gate)
 qa-runs/
+.vercel
+.env*

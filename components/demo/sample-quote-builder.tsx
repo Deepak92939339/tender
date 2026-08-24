@@ -5,8 +5,10 @@ import { z } from "zod";
 import { SampleDocumentPreview } from "./sample-document-preview";
 import {
   calculateSampleQuote,
+  displayedTaxRate,
   marketFor,
   publicMarkets,
+  taxRateIsFixed,
   taxPresentationOptions,
   type SampleQuoteState,
 } from "@/lib/demo/sample-quote-adapter";
@@ -315,16 +317,11 @@ export function SampleQuoteBuilder() {
                     Tax %
                     <input
                       inputMode="decimal"
-                      value={
-                        state.taxPresentation === "export-zero" ||
-                        state.taxPresentation === "us-none"
-                          ? "0"
-                          : item.taxRate
-                      }
-                      disabled={
-                        state.taxPresentation === "export-zero" ||
-                        state.taxPresentation === "us-none"
-                      }
+                      value={displayedTaxRate(
+                        state.taxPresentation,
+                        item.taxRate,
+                      )}
+                      disabled={taxRateIsFixed(state.taxPresentation)}
                       onChange={(event) =>
                         updateItem(index, "taxRate", event.target.value)
                       }

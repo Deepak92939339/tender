@@ -81,5 +81,7 @@ test("qa-05: strict manager approval for high discount quote", async ({
 
   // Assert activity log contains approval entry
   const activityLog = page.locator(".activity-section");
-  await expect(activityLog).toContainText("Quotation approved.");
+  await expect(activityLog).toContainText(
+    "Verified quotation revision approve completed.",
+  );
 });

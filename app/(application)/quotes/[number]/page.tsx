@@ -1,8 +1,22 @@
 import { notFound } from "next/navigation";
 import { QuoteBuilder } from "@/components/quotes/quote-builder";
 import { IssuedPrintDocument } from "@/components/quotes/issued-print-document";
+import { RecipientAccessPanel } from "@/components/quotes/recipient-access-panel";
+import { RecipientCommitment } from "@/components/quotes/recipient-commitment";
 import { requireApplicationContext } from "@/lib/auth/context";
 import { effectiveQuoteState } from "@/lib/quotes/effective-state";
+import { calculateExtendedLineAmountMinor } from "@/lib/quotes/calculate";
+import {
+  canCreateShareLink,
+  defaultShareExpiry,
+  exclusiveEndOfOrganizationDate,
+  presentCommitmentEvents,
+  presentShareLinks,
+  SHARE_LINK_SELECT_COLUMNS,
+  type AcceptanceRecord,
+  type RecipientEventRecord,
+  type ShareLinkRecord,
+} from "@/lib/quotes/share-link";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function QuotePage({
@@ -28,6 +42,10 @@ export default async function QuotePage({
     itemsResult,
     chargesResult,
     activityResult,
+    revisionResult,
+    shareLinksResult,
+    recipientEventsResult,
+    acceptancesResult,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -73,6 +91,33 @@ export default async function QuotePage({
       .eq("organization_id", context.membership.organizationId)
       .eq("quote_id", quote.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("quote_revisions")
+      .select("id, revision_number, state, valid_until")
+      .eq("organization_id", context.membership.organizationId)
+      .eq("quote_id", quote.id)
+      .order("revision_number", { ascending: false }),
+    supabase
+      .from("quote_share_links")
+      .select(SHARE_LINK_SELECT_COLUMNS)
+      .eq("organization_id", context.membership.organizationId)
+      .eq("quote_id", quote.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("quote_recipient_events")
+      .select("id, event_type, message, created_at, revision_id, share_link_id")
+      .eq("organization_id", context.membership.organizationId)
+      .eq("quote_id", quote.id)
+      .in("event_type", ["change_requested", "declined", "accepted"])
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("quote_acceptances")
+      .select(
+        "id, accepted_at, recipient_email_snapshot, buyer_asserted_name, buyer_asserted_title, acceptance_statement_version, acceptance_statement, revision_id, snapshot_hash, calculation_fingerprint, share_link_id",
+      )
+      .eq("organization_id", context.membership.organizationId)
+      .eq("quote_id", quote.id)
+      .order("accepted_at", { ascending: false }),
   ]);
   if (
     customersResult.error ||
@@ -80,7 +125,11 @@ export default async function QuotePage({
     taxResult.error ||
     itemsResult.error ||
     chargesResult.error ||
-    activityResult.error
+    activityResult.error ||
+    revisionResult.error ||
+    shareLinksResult.error ||
+    recipientEventsResult.error ||
+    acceptancesResult.error
   )
     throw new Error("Unable to load quotation builder references.");
   const taxProfiles = taxResult.data ?? [];
@@ -122,6 +171,37 @@ export default async function QuotePage({
           contactPhone: quote.seller_contact_phone_snapshot,
         }
       : null;
+  const currentRevision = (revisionResult.data ?? []).find(
+    (revision) => revision.id === quote.current_revision_id,
+  );
+  const canShare =
+    context.capabilities.includes("quote.share") &&
+    canCreateShareLink({
+      currentRevisionId: quote.current_revision_id,
+      revisionId: currentRevision?.id,
+      revisionState: currentRevision?.state,
+    });
+  const timezone = context.membership.organization.timezone;
+  const validUntil = currentRevision?.valid_until ?? quote.valid_until;
+  const maxExpires = exclusiveEndOfOrganizationDate(validUntil, timezone);
+  const defaultExpires = defaultShareExpiry(validUntil, timezone);
+  const shareLinks = presentShareLinks(
+    (shareLinksResult.data ?? []) as ShareLinkRecord[],
+  );
+  const revisionNumbers = new Map(
+    (revisionResult.data ?? []).map((revision) => [
+      revision.id,
+      revision.revision_number,
+    ]),
+  );
+  const commitmentEvents = presentCommitmentEvents(
+    (recipientEventsResult.data ?? []) as RecipientEventRecord[],
+    (acceptancesResult.data ?? []) as AcceptanceRecord[],
+    revisionNumbers,
+  );
+  const showCommitment =
+    Boolean(quote.current_revision_id) &&
+    (currentRevision?.state === "issued" || commitmentEvents.length > 0);
   return (
     <section className="quote-page">
       <QuoteBuilder
@@ -220,6 +300,26 @@ export default async function QuotePage({
           discountApplies: charge.discount_applies,
         }))}
       />
+      {canShare && currentRevision && (
+        <RecipientAccessPanel
+          quoteId={quote.id}
+          quoteVersion={quote.version}
+          revisionId={currentRevision.id}
+          revisionNumber={currentRevision.revision_number}
+          timezone={timezone}
+          locale={quote.locale}
+          maxExpiresAt={maxExpires.toISOString()}
+          defaultExpiresAt={(defaultExpires ?? maxExpires).toISOString()}
+          links={shareLinks}
+        />
+      )}
+      {showCommitment && (
+        <RecipientCommitment
+          locale={quote.locale}
+          timezone={timezone}
+          events={commitmentEvents}
+        />
+      )}
       <section className="activity-section" aria-labelledby="activity-heading">
         <header>
           <p className="eyebrow">Activity</p>
@@ -305,7 +405,11 @@ export default async function QuotePage({
             quantityScale: item.quantity_scale,
             unitPriceMinor: item.unit_price_minor_snapshot,
             taxCode: item.tax_code_snapshot,
-            lineTotalMinor: item.line_total_minor,
+            extendedAmountMinor: calculateExtendedLineAmountMinor({
+              unitPriceMinor: item.unit_price_minor_snapshot,
+              quantityScaled: item.quantity_scaled,
+              quantityScale: item.quantity_scale,
+            }),
           }))}
           charges={(chargesResult.data ?? []).map((charge) => ({
             id: charge.id,
@@ -316,7 +420,9 @@ export default async function QuotePage({
           }))}
           issuedActor={
             (activityResult.data ?? []).find(
-              (activity) => activity.event_type === "quote.issued",
+              (activity) =>
+                activity.event_type === "quote.issued" ||
+                activity.event_type === "quote.revision_issue",
             )?.actor_name_snapshot ?? "Tender user"
           }
         />

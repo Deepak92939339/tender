@@ -231,7 +231,7 @@ select is((public.create_quote_share_link(
     'buyer@example.test', '2026-09-01T00:00:00Z',
     'b1000000-0000-4000-8000-000000000005')->>'status'),
   'replayed_without_secret', 'share command replay creates no second secret');
-select is((select count(*)::integer from public.quote_share_links where quote_id=(select value::uuid from s1_values where key='quote_id')), 1, 'share replay creates one link');
+select is((select count(id)::integer from public.quote_share_links where revision_id=(select value::uuid from s1_values where key='revision_id')), 1, 'share replay creates one link');
 with shared as (
   select public.create_quote_share_link(
     (select value::uuid from s1_values where key='quote_id'),

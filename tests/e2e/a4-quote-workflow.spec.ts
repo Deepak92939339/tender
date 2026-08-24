@@ -31,6 +31,12 @@ async function createPreparedQuote(
     .selectOption({ label: "Asha Engineering Works" });
   await page.getByRole("button", { name: "Create draft" }).click();
   await expect(page).toHaveURL(/\/quotes\/TND-\d{4}-\d{4,}$/);
+  const catalog = page.getByLabel("Catalog product");
+  if (await catalog.count()) {
+    await catalog.selectOption({
+      label: "PCA-220 — Precision coupling assembly",
+    });
+  }
   for (let index = 0; index < lineCount; index += 1)
     await page.getByRole("button", { name: "Add product" }).click();
   await waitForSave(page);
@@ -65,7 +71,7 @@ test("operator submits boundary-approved quote, issues separately, then prints",
   });
   await expect(page.getByRole("button", { name: "Issue quote" })).toBeVisible();
   await expect(
-    page.getByText("Quotation submitted for decision."),
+    page.getByText("Verified quotation revision submit completed."),
   ).toBeVisible();
   await expect(page.getByText("Approval rule", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: /Print|PDF/ })).toHaveCount(0);
@@ -75,7 +81,10 @@ test("operator submits boundary-approved quote, issues separately, then prints",
     timeout: 20_000,
   });
   await expect(
-    page.getByText("Delivery has not occurred", { exact: false }),
+    page.getByText("Verified quotation revision issue completed."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Issued does not mean Delivered", { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Print / Save PDF" }),

@@ -1,8 +1,9 @@
+import { isCanonicalBase64url } from "../../../lib/public-quotes/base64url.ts";
+
 export const MAX_REQUEST_BODY_BYTES = 16 * 1024;
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SHARE_SECRET = /^[A-Za-z0-9_-]{43}$/;
 const VERIFICATION_CODE = /^[A-F0-9]{32}$/;
 const FORBIDDEN_IDENTITY_CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 const FORBIDDEN_MESSAGE_CONTROL =
@@ -128,7 +129,7 @@ function selector(value: unknown) {
 
 function secret(value: unknown) {
   const candidate = requiredString(value, "invalid_secret", "secret");
-  if (!SHARE_SECRET.test(candidate)) {
+  if (!isCanonicalBase64url(candidate, 32)) {
     throw new RequestValidationError(
       "invalid_secret",
       "secret must be an unpadded 32-byte base64url value.",

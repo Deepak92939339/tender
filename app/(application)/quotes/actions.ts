@@ -9,6 +9,12 @@ import {
   withReference,
 } from "@/lib/errors/mutation-failure";
 import { isSupportedCurrency } from "@/lib/formatting/currency";
+import {
+  canCreateShareLink,
+  createShareLinkPresentation,
+  isShareExpiryWithinRevision,
+  parseCreateShareLinkResult,
+} from "@/lib/quotes/share-link";
 
 const supportedCurrencySchema = z
   .string()
@@ -232,7 +238,7 @@ export async function createQuoteDraft(
         "Draft creation failed. Nothing was saved. Check the customer, dates, currency, locale and tax fields.",
     };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("create_quote_draft", {
+  const { data, error } = await supabase.rpc("create_verified_quote_draft", {
     p_organization_id: context.membership.organizationId,
     p_customer_id: parsed.data.customerId,
     p_currency_code: parsed.data.currencyCode,
@@ -488,11 +494,42 @@ export async function runQuoteWorkflowAction(
         "Rejection needs a meaningful reason of at least three characters. Nothing changed.",
     };
   const supabase = await createClient();
+  const { data: quoteRow, error: quoteLookupError } = await supabase
+    .from("quotes")
+    .select("id, current_revision_id")
+    .eq("organization_id", context.membership.organizationId)
+    .eq("id", parsed.data.quoteId)
+    .maybeSingle();
+  if (quoteLookupError || !quoteRow) {
+    const reference = logMutationFailure(
+      "quote.workflow_lookup",
+      quoteLookupError ?? undefined,
+    );
+    return {
+      status: "failed",
+      message: withReference(
+        "The quotation could not be resolved inside this organization. Nothing changed.",
+        reference,
+      ),
+    };
+  }
   let result: {
     data: unknown;
     error: { code?: string; message: string } | null;
   };
-  if (parsed.data.action === "submit")
+  if (quoteRow?.current_revision_id) {
+    result = await callRevisionWorkflow(
+      supabase as unknown as RevisionRpcClient,
+      parsed.data.action,
+      {
+        quoteId: parsed.data.quoteId,
+        revisionId: quoteRow.current_revision_id,
+        expectedVersion: parsed.data.expectedVersion,
+        commandId: parsed.data.commandId,
+        reason: parsed.data.reason,
+      },
+    );
+  } else if (parsed.data.action === "submit")
     result = await supabase.rpc("submit_quote", {
       p_quote_id: parsed.data.quoteId,
       p_expected_version: parsed.data.expectedVersion,
@@ -566,4 +603,323 @@ export async function runQuoteWorkflowAction(
     state: String(data.state),
     version: Number(data.version),
   };
+}
+
+type RevisionRpcClient = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{
+    data: unknown;
+    error: { code?: string; message: string } | null;
+  }>;
+};
+
+async function callRevisionWorkflow(
+  supabase: RevisionRpcClient,
+  action: "submit" | "approve" | "reject" | "issue",
+  input: {
+    quoteId: string;
+    revisionId: string;
+    expectedVersion: number;
+    commandId: string;
+    reason?: string;
+  },
+) {
+  const args: Record<string, unknown> = {
+    p_quote_id: input.quoteId,
+    p_revision_id: input.revisionId,
+    p_expected_version: input.expectedVersion,
+    p_command_id: input.commandId,
+  };
+  if (action === "reject") args.p_reason = input.reason;
+  return supabase.rpc(`${action}_quote_revision`, args);
+}
+
+const shareCreateSchema = z.object({
+  quoteId: z.string().uuid(),
+  revisionId: z.string().uuid(),
+  expectedVersion: z.number().int().positive(),
+  commandId: z.string().uuid(),
+  recipientEmail: z.string().trim().email().min(3).max(254),
+  expiresAt: z.iso.datetime(),
+});
+
+export type CreateShareLinkActionResult = {
+  status: "created" | "replayed" | "stale" | "failed";
+  message: string;
+  linkId?: string;
+  url?: string;
+};
+
+export async function createQuoteShareLinkAction(
+  input: unknown,
+): Promise<CreateShareLinkActionResult> {
+  const context = await requireApplicationContext();
+  if (!context.capabilities.includes("quote.share")) {
+    return {
+      status: "failed",
+      message:
+        "Recipient link creation failed. Nothing changed. Your role cannot share quotations.",
+    };
+  }
+  const parsed = shareCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      status: "failed",
+      message:
+        "Recipient link creation failed. Check the recipient email and expiry, then try again.",
+    };
+  }
+  const supabase = await createClient();
+  const { data: quoteRow, error: quoteError } = await supabase
+    .from("quotes")
+    .select("id, number, current_revision_id, valid_until")
+    .eq("organization_id", context.membership.organizationId)
+    .eq("id", parsed.data.quoteId)
+    .maybeSingle();
+  const { data: revision, error: revisionError } = quoteRow?.current_revision_id
+    ? await supabase
+        .from("quote_revisions")
+        .select("id, state, valid_until")
+        .eq("organization_id", context.membership.organizationId)
+        .eq("quote_id", parsed.data.quoteId)
+        .eq("id", parsed.data.revisionId)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (quoteError || revisionError) {
+    const reference = logMutationFailure(
+      "quote.create_share_link_lookup",
+      quoteError ?? revisionError ?? undefined,
+    );
+    return {
+      status: "failed",
+      message: withReference(
+        "Recipient link creation failed because the tenant-scoped quotation could not be verified. Nothing changed.",
+        reference,
+      ),
+    };
+  }
+  if (
+    !canCreateShareLink({
+      currentRevisionId: quoteRow?.current_revision_id,
+      revisionId: parsed.data.revisionId,
+      revisionState: revision?.state,
+    })
+  ) {
+    return {
+      status: "failed",
+      message:
+        "Recipient link creation failed. A link can be created only for the current issued revision.",
+    };
+  }
+  const expiresAt = new Date(parsed.data.expiresAt);
+  const validUntil = revision?.valid_until ?? quoteRow?.valid_until;
+  if (
+    !validUntil ||
+    !isShareExpiryWithinRevision({
+      expiresAt,
+      now: new Date(),
+      validUntil,
+      timeZone: context.membership.organization.timezone,
+    })
+  ) {
+    return {
+      status: "failed",
+      message:
+        "Recipient link creation failed. Expiry must be after now and no later than the quotation validity period.",
+    };
+  }
+  const { data, error } = await supabase.rpc("create_quote_share_link", {
+    p_quote_id: parsed.data.quoteId,
+    p_revision_id: parsed.data.revisionId,
+    p_expected_version: parsed.data.expectedVersion,
+    p_recipient_email: parsed.data.recipientEmail,
+    p_expires_at: parsed.data.expiresAt,
+    p_command_id: parsed.data.commandId,
+  });
+  if (error) {
+    const reference = logMutationFailure("quote.create_share_link", error);
+    if (error.message.includes("revision_stale") || error.code === "40001") {
+      return {
+        status: "stale",
+        message: withReference(
+          "Recipient link creation failed because the quotation changed. Reload and try again.",
+          reference,
+        ),
+      };
+    }
+    if (error.message.includes("share_expiry_invalid")) {
+      return {
+        status: "failed",
+        message: withReference(
+          "Recipient link creation failed. Expiry must stay inside the quotation validity period.",
+          reference,
+        ),
+      };
+    }
+    if (error.message.includes("quote_share_forbidden")) {
+      return {
+        status: "failed",
+        message: withReference(
+          "Recipient link creation failed. Your role cannot share quotations.",
+          reference,
+        ),
+      };
+    }
+    return {
+      status: "failed",
+      message: withReference(
+        "Recipient link creation failed. Nothing changed.",
+        reference,
+      ),
+    };
+  }
+  const parsedResult = parseCreateShareLinkResult(data);
+  if (!parsedResult) {
+    const reference = logMutationFailure(
+      "quote.create_share_link_acknowledgement",
+    );
+    return {
+      status: "failed",
+      message: withReference(
+        "Recipient link creation returned no usable acknowledgement. Nothing should be assumed created.",
+        reference,
+      ),
+    };
+  }
+  const presented = createShareLinkPresentation(parsedResult);
+  revalidatePath("/quotes");
+  revalidatePath(`/quotes/${encodeURIComponent(quoteRow!.number)}`);
+  if (presented.status === "replayed_without_secret") {
+    return {
+      status: "replayed",
+      linkId: presented.linkId,
+      message:
+        "This create request was already recorded. The original recipient secret cannot be recovered.",
+    };
+  }
+  return {
+    status: "created",
+    linkId: presented.linkId,
+    url: presented.url ?? undefined,
+    message:
+      "Recipient link created. Copy or open it now. Tender cannot show this secret again after you leave this page.",
+  };
+}
+
+const shareRevokeSchema = z.object({
+  quoteId: z.string().uuid(),
+  shareLinkId: z.string().uuid(),
+  expectedVersion: z.number().int().positive(),
+  commandId: z.string().uuid(),
+});
+
+const shareRevokeResultSchema = z
+  .object({
+    id: z.string().uuid(),
+    quote_id: z.string().uuid(),
+    revision_id: z.string().uuid(),
+    disabled_reason: z.literal("revoked"),
+    disabled_at: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export type RevokeShareLinkActionResult = {
+  status: "ok" | "stale" | "failed";
+  message: string;
+};
+
+export async function revokeQuoteShareLinkAction(
+  input: unknown,
+): Promise<RevokeShareLinkActionResult> {
+  const context = await requireApplicationContext();
+  if (!context.capabilities.includes("quote.share")) {
+    return {
+      status: "failed",
+      message:
+        "Revocation failed. Nothing changed. Your role cannot share quotations.",
+    };
+  }
+  const parsed = shareRevokeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      status: "failed",
+      message: "Revocation failed. Reload the quotation and try again.",
+    };
+  }
+  const supabase = await createClient();
+  const { data: quoteRow, error: quoteError } = await supabase
+    .from("quotes")
+    .select("id, number")
+    .eq("organization_id", context.membership.organizationId)
+    .eq("id", parsed.data.quoteId)
+    .maybeSingle();
+  if (quoteError || !quoteRow) {
+    const reference = logMutationFailure(
+      "quote.revoke_share_link_lookup",
+      quoteError ?? undefined,
+    );
+    return {
+      status: "failed",
+      message: withReference(
+        "Revocation failed because the tenant-scoped quotation could not be verified. Nothing changed.",
+        reference,
+      ),
+    };
+  }
+  const { data, error } = await supabase.rpc("revoke_quote_share_link", {
+    p_quote_id: parsed.data.quoteId,
+    p_share_link_id: parsed.data.shareLinkId,
+    p_expected_version: parsed.data.expectedVersion,
+    p_command_id: parsed.data.commandId,
+  });
+  if (error) {
+    const reference = logMutationFailure("quote.revoke_share_link", error);
+    if (
+      error.message.includes("quote_version_stale") ||
+      error.code === "40001"
+    ) {
+      return {
+        status: "stale",
+        message: withReference(
+          "Revocation failed because the quotation changed. Reload and try again.",
+          reference,
+        ),
+      };
+    }
+    if (error.message.includes("quote_share_forbidden")) {
+      return {
+        status: "failed",
+        message: withReference(
+          "Revocation failed. Your role cannot share quotations.",
+          reference,
+        ),
+      };
+    }
+    return {
+      status: "failed",
+      message: withReference("Revocation failed. Nothing changed.", reference),
+    };
+  }
+  const acknowledgement = shareRevokeResultSchema.safeParse(data);
+  if (
+    !acknowledgement.success ||
+    acknowledgement.data.id !== parsed.data.shareLinkId ||
+    acknowledgement.data.quote_id !== parsed.data.quoteId
+  ) {
+    const reference = logMutationFailure(
+      "quote.revoke_share_link_acknowledgement",
+    );
+    return {
+      status: "failed",
+      message: withReference(
+        "Revocation returned no acknowledgement. Reload before continuing.",
+        reference,
+      ),
+    };
+  }
+  revalidatePath("/quotes");
+  revalidatePath(`/quotes/${encodeURIComponent(quoteRow.number)}`);
+  return { status: "ok", message: "Recipient link revoked." };
 }

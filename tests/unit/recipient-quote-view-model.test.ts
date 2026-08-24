@@ -45,6 +45,16 @@ describe("recipient quote view model", () => {
       );
     },
   );
+
+  it("presents quantity times unit price without changing stored line totals", () => {
+    const source = projection(3);
+    const item = source.snapshot.items[0]!;
+    const view = recipientQuoteViewModel(source);
+    expect(item.line_total_minor).toBe(14_172);
+    expect(view.items[0]!.lineAmountDisplay).toBe(
+      formatMinor(14_997, view.currencyCode, view.locale),
+    );
+  });
 });
 
 describe("public verification normalization", () => {

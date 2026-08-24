@@ -1,5 +1,6 @@
 import { formatMinor } from "@/lib/formatting/money";
 import {
+  calculateExtendedLineAmountMinor,
   calculateQuote,
   type QuoteCalculationInput,
 } from "@/lib/quotes/calculate";
@@ -29,8 +30,8 @@ export function DecisionDocument({
           <strong>Asha Engineering Works</strong>
         </div>
         <div>
-          <span>Valid until</span>
-          <strong>21 Aug 2026</strong>
+          <span>Validity</span>
+          <strong>Demonstration only</strong>
         </div>
       </div>
       <div className="decision-lines">
@@ -42,7 +43,14 @@ export function DecisionDocument({
               {item.unit_code_snapshot}
             </small>
             <strong>
-              {formatMinor(item.line_total_minor, input.currency_code)}
+              {formatMinor(
+                calculateExtendedLineAmountMinor({
+                  unitPriceMinor: item.unit_price_minor_snapshot,
+                  quantityScaled: item.quantity_scaled,
+                  quantityScale: item.quantity_scale,
+                }),
+                input.currency_code,
+              )}
             </strong>
           </div>
         ))}

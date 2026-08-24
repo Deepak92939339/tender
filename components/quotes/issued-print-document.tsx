@@ -18,7 +18,7 @@ type PrintItem = {
   quantityScale: number;
   unitPriceMinor: number;
   taxCode: string;
-  lineTotalMinor: number;
+  extendedAmountMinor: number;
 };
 type PrintCharge = {
   id: string;
@@ -196,7 +196,7 @@ export function IssuedPrintDocument({
                     <td>{item.taxCode}</td>
                     <td>
                       {formatMinor(
-                        item.lineTotalMinor,
+                        item.extendedAmountMinor,
                         quote.currencyCode,
                         quote.locale,
                       )}

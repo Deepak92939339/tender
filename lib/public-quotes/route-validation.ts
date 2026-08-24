@@ -1,10 +1,10 @@
 import type { TransportBrokerAction } from "./transport.ts";
+import { isCanonicalBase64url } from "./base64url.ts";
 
 export const NEXT_PUBLIC_REQUEST_MAX_BYTES = 8 * 1024;
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SHARE_SECRET = /^[A-Za-z0-9_-]{43}$/;
 const VERIFICATION_CODE = /^[A-F0-9]{32}$/;
 const FORBIDDEN_IDENTITY_CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 const FORBIDDEN_MESSAGE_CONTROL =
@@ -65,7 +65,7 @@ function selector(value: unknown) {
 
 function secret(value: unknown) {
   const candidate = string(value, "invalid_secret");
-  if (!SHARE_SECRET.test(candidate))
+  if (!isCanonicalBase64url(candidate, 32))
     throw new PublicRouteError("invalid_secret");
   return candidate;
 }

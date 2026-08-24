@@ -3,6 +3,7 @@ import type {
   VerificationProjection,
 } from "@/lib/quotes/commitment-contracts";
 import { formatMinor } from "@/lib/formatting/money";
+import { calculateExtendedLineAmountMinor } from "@/lib/quotes/calculate";
 
 export type RecipientQuoteViewModel = {
   quoteNumber: string;
@@ -20,7 +21,7 @@ export type RecipientQuoteViewModel = {
   buyer: BuyerQuoteProjection["snapshot"]["buyer"];
   items: Array<
     BuyerQuoteProjection["snapshot"]["items"][number] & {
-      totalDisplay: string;
+      lineAmountDisplay: string;
       unitPriceDisplay: string;
     }
   >;
@@ -66,7 +67,13 @@ export function recipientQuoteViewModel(
     items: snapshot.items.map((item) => ({
       ...item,
       unitPriceDisplay: money(item.unit_price_minor),
-      totalDisplay: money(item.line_total_minor),
+      lineAmountDisplay: money(
+        calculateExtendedLineAmountMinor({
+          unitPriceMinor: item.unit_price_minor,
+          quantityScaled: item.quantity_scaled,
+          quantityScale: item.quantity_scale,
+        }),
+      ),
     })),
     charges: snapshot.charges.map((charge) => ({
       ...charge,

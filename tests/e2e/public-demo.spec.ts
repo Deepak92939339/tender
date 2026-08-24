@@ -53,6 +53,22 @@ test("public specimen uses all five exponent-aware markets and live authoritativ
   await page.getByLabel("Tax presentation").selectOption("canada-bc");
   await expect(preview).toContainText("GST 5%");
   await expect(preview).toContainText("PST 7%");
+  await expect(
+    page.locator(".sample-editor-line").first().getByLabel("Tax %"),
+  ).toHaveValue("12");
+  await expect(
+    preview.locator(".sample-totals div").filter({ hasText: "GST 5%" }),
+  ).toContainText("CAD 1,753.40");
+  await expect(
+    preview.locator(".sample-totals div").filter({ hasText: "PST 7%" }),
+  ).toContainText("CAD 2,454.76");
+  await expect(preview.locator(".sample-line").first()).toContainText(
+    "CAD 22,400.00",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("public-demo-bc-before.png"),
+    fullPage: true,
+  });
   const before = await preview.locator(".sample-total dd").textContent();
   await page
     .locator(".sample-editor-line")
@@ -62,6 +78,29 @@ test("public specimen uses all five exponent-aware markets and live authoritativ
   await expect(preview.locator(".sample-total dd")).not.toHaveText(
     before ?? "",
   );
+  await expect(preview.locator(".sample-line").first()).toContainText(
+    "CAD 400.00",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("public-demo-bc-after-line.png"),
+    fullPage: true,
+  });
+  const documentCustomer = preview
+    .locator(".sample-document-meta > div")
+    .nth(1)
+    .locator("strong");
+  for (const customerName of [
+    "Northern British Columbia Advanced Industrial Procurement Cooperative Limited",
+    "NorthernBritishColumbiaAdvancedIndustrialProcurementCooperativeLimited",
+  ]) {
+    await page.getByLabel("Customer name").fill(customerName);
+    await expect(documentCustomer).toHaveText(customerName);
+    expect(
+      await documentCustomer.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+  }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({
     path: testInfo.outputPath("public-demo-1440x900.png"),

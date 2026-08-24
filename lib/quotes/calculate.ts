@@ -87,6 +87,32 @@ function roundedRatio(value: bigint, multiplier: bigint, divisor: bigint) {
   return (value * multiplier + divisor / 2n) / divisor;
 }
 
+export function calculateExtendedLineAmountMinor(input: {
+  unitPriceMinor: number;
+  quantityScaled: number;
+  quantityScale: number;
+}) {
+  const unitPrice = integer(input.unitPriceMinor, "unitPriceMinor");
+  const quantityScaled = integer(input.quantityScaled, "quantityScaled");
+  const quantityScale = integer(input.quantityScale, "quantityScale");
+  if (quantityScale === 0n)
+    throw new RangeError("quantityScale must be greater than zero.");
+  return safe(
+    roundedRatio(unitPrice, quantityScaled, quantityScale),
+    "extendedLineAmountMinor",
+  );
+}
+
+export function calculateTaxAmountMinor(
+  taxableBaseMinor: number,
+  rateBps: number,
+) {
+  const taxableBase = integer(taxableBaseMinor, "taxableBaseMinor");
+  const rate = integer(rateBps, "rateBps");
+  if (rate > BASIS_POINTS) throw new RangeError("rateBps cannot exceed 10000.");
+  return safe(roundedRatio(taxableBase, rate, BASIS_POINTS), "taxAmountMinor");
+}
+
 export function quantityIsValid(
   unitCode: UnitCode,
   precision: number,

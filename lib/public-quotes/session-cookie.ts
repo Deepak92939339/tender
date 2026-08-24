@@ -1,3 +1,9 @@
+import {
+  decodeCanonicalBase64url,
+  encodeBase64url,
+  isCanonicalBase64url,
+} from "./base64url.ts";
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -9,8 +15,6 @@ export const PUBLIC_QUOTE_COOKIE_MAX_BYTES = 1_024;
 const COOKIE_AAD = `${PUBLIC_QUOTE_COOKIE_NAME}\0${PUBLIC_QUOTE_COOKIE_PATH}\0v1`;
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SHARE_SECRET = /^[A-Za-z0-9_-]{43}$/;
-const BASE64URL = /^[A-Za-z0-9_-]+$/;
 
 export type PublicQuoteCapability = {
   version: 1;
@@ -18,25 +22,6 @@ export type PublicQuoteCapability = {
   secret: string;
   expiresAt: number;
 };
-
-function base64url(bytes: Uint8Array) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-function fromBase64url(value: string) {
-  if (!BASE64URL.test(value)) throw new Error("Invalid encrypted session.");
-  const padded = value
-    .replace(/-/g, "+")
-    .replace(/_/g, "/")
-    .padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
 
 async function encryptionKey(secret: string) {
   if (encoder.encode(secret).byteLength < 32) {
@@ -65,7 +50,7 @@ function validateCapability(
     typeof row.selector !== "string" ||
     !UUID_V4.test(row.selector) ||
     typeof row.secret !== "string" ||
-    !SHARE_SECRET.test(row.secret) ||
+    !isCanonicalBase64url(row.secret, 32) ||
     typeof row.expiresAt !== "number" ||
     !Number.isSafeInteger(row.expiresAt) ||
     row.expiresAt <= now ||
@@ -101,7 +86,7 @@ export async function encryptPublicQuoteCapability(
       encoder.encode(JSON.stringify(capability)),
     ),
   );
-  const token = `v1.${base64url(nonce)}.${base64url(ciphertext)}`;
+  const token = `v1.${encodeBase64url(nonce)}.${encodeBase64url(ciphertext)}`;
   if (encoder.encode(token).byteLength > PUBLIC_QUOTE_COOKIE_MAX_BYTES) {
     throw new Error("The encrypted session is too large.");
   }
@@ -121,9 +106,9 @@ export async function decryptPublicQuoteCapability(
     throw new Error("Invalid encrypted session.");
   }
   try {
-    const nonce = fromBase64url(parts[1]);
-    const ciphertext = fromBase64url(parts[2]);
-    if (nonce.byteLength !== 12 || ciphertext.byteLength < 17) {
+    const nonce = decodeCanonicalBase64url(parts[1], 12);
+    const ciphertext = decodeCanonicalBase64url(parts[2]);
+    if (ciphertext.byteLength < 17) {
       throw new Error("Invalid encrypted session.");
     }
     const plaintext = await crypto.subtle.decrypt(

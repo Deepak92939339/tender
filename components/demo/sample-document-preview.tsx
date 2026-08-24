@@ -1,19 +1,9 @@
 import { formatMinor } from "@/lib/formatting/money";
 import {
   marketFor,
-  taxLabels,
   type SampleQuoteState,
 } from "@/lib/demo/sample-quote-adapter";
 import { calculateSampleQuote } from "@/lib/demo/sample-quote-adapter";
-
-function componentAmounts(totalMinor: number, labels: readonly string[]) {
-  if (labels.length === 0) return [];
-  if (labels.length === 1) return [totalMinor];
-  // Presentation components partition the calculator's already-authoritative tax total.
-  const total = BigInt(totalMinor);
-  const first = total / 2n;
-  return [Number(first), Number(total - first)];
-}
 
 export function SampleDocumentPreview({
   state,
@@ -23,11 +13,6 @@ export function SampleDocumentPreview({
   quote: ReturnType<typeof calculateSampleQuote>;
 }) {
   const market = marketFor(state.marketId);
-  const labels = taxLabels(
-    state.taxPresentation,
-    state.items[0]?.taxRate ?? market.rate,
-  );
-  const components = componentAmounts(quote.tax_minor, labels);
   const taxIsIncluded = state.taxMode === "inclusive" && quote.tax_minor > 0;
   return (
     <article
@@ -53,9 +38,9 @@ export function SampleDocumentPreview({
           <small>Anonymous workspace</small>
         </div>
         <div>
-          <span>Date</span>
-          <strong>9 Aug 2026</strong>
-          <small>Valid until 21 Aug 2026</small>
+          <span>Document status</span>
+          <strong>Not issued</strong>
+          <small>No validity period</small>
         </div>
       </section>
       <div className="sample-document-lines">
@@ -64,7 +49,7 @@ export function SampleDocumentPreview({
           <span>Description</span>
           <span>Quantity</span>
           <span>Unit price</span>
-          <span>Final amount</span>
+          <span>Amount</span>
         </div>
         {quote.items.map((item, index) => (
           <div className="sample-line" key={item.product_id}>
@@ -83,7 +68,7 @@ export function SampleDocumentPreview({
             </span>
             <strong>
               {formatMinor(
-                item.line_total_minor,
+                item.extended_line_amount_minor,
                 market.currency,
                 market.locale,
               )}
@@ -91,10 +76,6 @@ export function SampleDocumentPreview({
           </div>
         ))}
       </div>
-      <p className="sample-line-note">
-        Final amount is the line result after the shared calculator applies the
-        discount and applicable tax basis.
-      </p>
       <dl className="sample-totals">
         <div>
           <dt>Subtotal</dt>
@@ -117,10 +98,16 @@ export function SampleDocumentPreview({
             </dd>
           </div>
         ) : null}
-        {components.map((amount, index) => (
-          <div key={labels[index]}>
-            <dt>{labels[index]}</dt>
-            <dd>{formatMinor(amount, market.currency, market.locale)}</dd>
+        {quote.tax_components.map((component) => (
+          <div key={`${component.label}:${component.rateBps}`}>
+            <dt>{component.label}</dt>
+            <dd>
+              {formatMinor(
+                component.amountMinor,
+                market.currency,
+                market.locale,
+              )}
+            </dd>
           </div>
         ))}
         {taxIsIncluded ? (

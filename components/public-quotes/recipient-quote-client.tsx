@@ -412,7 +412,7 @@ export function RecipientQuoteClient({ selector }: { selector: string }) {
                     </td>
                     <td data-label="Unit price">{item.unitPriceDisplay}</td>
                     <td data-label="Tax">{item.tax_code}</td>
-                    <td data-label="Amount">{item.totalDisplay}</td>
+                    <td data-label="Amount">{item.lineAmountDisplay}</td>
                   </tr>
                 ))}
               </tbody>

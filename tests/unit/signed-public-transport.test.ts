@@ -13,6 +13,10 @@ import {
   PUBLIC_QUOTE_COOKIE_NAME,
 } from "../../lib/public-quotes/session-cookie.ts";
 import {
+  decodeCanonicalBase64url,
+  encodeBase64url,
+} from "../../lib/public-quotes/base64url.ts";
+import {
   NEXT_PUBLIC_REQUEST_MAX_BYTES,
   parseActionRequest,
   parseSessionRequest,
@@ -24,7 +28,7 @@ import {
 
 const selector = "10000000-0000-4000-8000-000000000001";
 const idempotencyKey = "20000000-0000-4000-8000-000000000001";
-const shareSecret = "a".repeat(43);
+const shareSecret = "A".repeat(43);
 const transportSecret = "unit-transport-secret-with-more-than-thirty-two-bytes";
 const sessionSecret = "unit-session-key-with-more-than-thirty-two-bytes";
 const origin = "https://quotes.example.test";
@@ -85,19 +89,62 @@ describe("public quote capability cookie", () => {
     });
   });
 
-  it("rejects ciphertext, tag, and expiry tampering", async () => {
+  it("rejects decoded ciphertext bytes, decoded tag bytes, and expiry tampering", async () => {
     const now = Math.floor(Date.now() / 1_000);
     const token = await encryptPublicQuoteCapability(
       { version: 1, selector, secret: shareSecret, expiresAt: now + 300 },
       sessionSecret,
     );
-    const tampered = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+    const parts = token.split(".");
+    const encrypted = decodeCanonicalBase64url(parts[2]!);
+    const tamperedCiphertext = encrypted.slice();
+    tamperedCiphertext[0] = tamperedCiphertext[0]! ^ 1;
+    const tamperedTag = encrypted.slice();
+    tamperedTag[tamperedTag.length - 1] =
+      tamperedTag[tamperedTag.length - 1]! ^ 1;
     await expect(
-      decryptPublicQuoteCapability(tampered, sessionSecret, now),
+      decryptPublicQuoteCapability(
+        `${parts[0]}.${parts[1]}.${encodeBase64url(tamperedCiphertext)}`,
+        sessionSecret,
+        now,
+      ),
+    ).rejects.toThrow(/invalid encrypted session/i);
+    await expect(
+      decryptPublicQuoteCapability(
+        `${parts[0]}.${parts[1]}.${encodeBase64url(tamperedTag)}`,
+        sessionSecret,
+        now,
+      ),
     ).rejects.toThrow(/invalid encrypted session/i);
     await expect(
       decryptPublicQuoteCapability(token, sessionSecret, now + 301),
     ).rejects.toThrow(/invalid encrypted session/i);
+  });
+
+  it("rejects malformed and alternate non-canonical base64url spellings", async () => {
+    const now = 1_800_000_000;
+    const token = await encryptPublicQuoteCapability(
+      { version: 1, selector, secret: shareSecret, expiresAt: now + 300 },
+      sessionSecret,
+    );
+    const parts = token.split(".");
+    const alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const ciphertext = parts[2]!;
+    expect(ciphertext.length % 4).not.toBe(0);
+    const canonicalIndex = alphabet.indexOf(ciphertext.at(-1)!);
+    const alternate = `${ciphertext.slice(0, -1)}${alphabet[canonicalIndex + 1]}`;
+    await expect(
+      decryptPublicQuoteCapability(
+        `${parts[0]}.${parts[1]}.${alternate}`,
+        sessionSecret,
+        now,
+      ),
+    ).rejects.toThrow(/invalid encrypted session/i);
+    await expect(
+      decryptPublicQuoteCapability("v1.invalid=.invalid", sessionSecret, now),
+    ).rejects.toThrow(/invalid encrypted session/i);
+    expect(() => decodeCanonicalBase64url("AB")).toThrow(/invalid base64url/i);
   });
 });
 
@@ -239,6 +286,12 @@ describe("public quote route boundary", () => {
         selector,
         secret: shareSecret,
         organizationId: selector,
+      }),
+    ).toThrow(/invalid/i);
+    expect(() =>
+      parseSessionRequest({
+        selector,
+        secret: `${shareSecret.slice(0, -1)}B`,
       }),
     ).toThrow(/invalid/i);
     const broker = vi.fn();
