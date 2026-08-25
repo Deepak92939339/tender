@@ -18,7 +18,7 @@ The wrapper `scripts/seed-cloud-demo.mjs`:
 - makes no changes when its unique demo organization slug already exists;
 - ends by assigning the demo user the `manager` role.
 
-The allowlist intentionally contains `REPLACE_WITH_DEMO_PROJECT_REF`. Preview and apply refuse to run until the future project reference replaces it.
+The committed allowlist contains only the dedicated disposable portfolio-demo project reference. Preview and apply refuse any other project; rotate that entry deliberately if the demo project is recreated.
 
 ## Deliberate invocation
 

@@ -2,7 +2,7 @@
 
 Tender is a multi-tenant commercial quotation application for preparing priced offers, routing discount decisions, and issuing an accountable customer-facing record. It demonstrates how a compact B2B workflow can keep tenant isolation, exact money, approval policy, lifecycle transitions, and audit activity inside one coherent system.
 
-> Live demo: **not deployed yet** — add the production URL here after the first verified deployment.
+> Live demo: **[tender-eta-orpin.vercel.app](https://tender-eta-orpin.vercel.app)**
 
 ## Release-candidate status
 
@@ -72,7 +72,7 @@ Normal local behavior keeps self-service signup enabled. Set the server-only var
 
 Hosted Supabase email signup must also be disabled in Auth settings. Create a dedicated demo user with a strong unique password outside the repository, seed the fictional dataset using that user's UUID, and share access privately. The cloud seed downgrades the account to the non-admin `manager` role after provisioning. No hosted password belongs in source, documentation, Vercel, or deployment logs.
 
-The cloud demo dataset is separate from the local test seed and never runs during migration deployment. Its allowlist is intentionally unresolved until a real Supabase project exists. See [Demo data](docs/DEMO_DATA.md).
+The cloud demo dataset is separate from the local test seed and never runs during migration deployment. Its allowlist is pinned to the dedicated disposable portfolio-demo project, while application remains a deliberate, guarded, idempotent operator action. See [Demo data](docs/DEMO_DATA.md).
 
 ## Deployment
 
@@ -84,7 +84,7 @@ The intended deployment is Vercel for Next.js plus one dedicated Supabase projec
 - `TENDER_EDGE_BROKER_TRANSPORT_SECRET` for the server-to-server public broker envelope
 - `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY` for the short-lived encrypted recipient session
 
-The transport and session secrets are server-only Next.js runtime values; `TENDER_DEMO_MODE` is a server-only non-secret flag. No service-role key or database URL is used by Next.js or browser runtime. The isolated Supabase Edge broker alone receives the service-role credential for its four fixed RPC calls. The database URL is needed only in the operator's local environment for the deliberately invoked cloud demo-data command. No `vercel.json` is required for the current Next.js deployment. Full preparation, migration dry-run, Auth URL settings, smoke checks, and rollback assumptions are in [Deployment](docs/DEPLOYMENT.md).
+The transport and session secrets are server-only Next.js runtime values; `TENDER_DEMO_MODE` is a server-only non-secret flag. No service-role key or database URL is used by Next.js or browser runtime. The isolated Supabase Edge broker alone receives the service-role credential for its four fixed RPC calls. The database URL is needed only in the operator's local environment for the deliberately invoked cloud demo-data command. No `vercel.json` is required for the current Next.js deployment. Full preparation, migration dry-run, Auth URL settings, smoke checks, and rollback assumptions are in [Deployment](docs/DEPLOYMENT.md); the verified public release is recorded in [Production deployment evidence](docs/DEPLOYMENT_EVIDENCE.md).
 
 ## Current limitations
 
