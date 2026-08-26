@@ -21,38 +21,68 @@ export const getApplicationContext = cache(async () => {
       .maybeSingle(),
     supabase
       .from("organization_memberships")
-      .select(
-        "organization_id, status, created_at, roles!inner(key, label), organizations!inner(id, slug, name, default_currency_code, default_locale, approval_threshold_bps, timezone)",
-      )
+      .select("organization_id, role_id, status, created_at")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: true }),
   ]);
 
-  if (error)
+  if (error) {
+    console.error("auth_context_membership_query_failed", {
+      code: error.code,
+      message: error.message,
+    });
     throw new Error("Unable to load the authenticated organization context.");
+  }
   const membershipRow = memberships?.[0] ?? null;
-  const membership = membershipRow
-    ? {
-        organizationId: membershipRow.organization_id,
-        status: membershipRow.status,
-        createdAt: membershipRow.created_at,
-        role: Array.isArray(membershipRow.roles)
-          ? membershipRow.roles[0]
-          : membershipRow.roles,
-        organization: Array.isArray(membershipRow.organizations)
-          ? membershipRow.organizations[0]
-          : membershipRow.organizations,
-      }
-    : null;
-
+  let membership = null;
   let capabilities: string[] = [];
-  if (membership) {
-    const { data } = await supabase
-      .from("role_capabilities")
-      .select("capability_key, roles!inner(key)")
-      .eq("roles.key", membership.role.key);
-    capabilities = data?.map((row) => row.capability_key) ?? [];
+  if (membershipRow) {
+    const [roleResult, organizationResult, capabilityResult] =
+      await Promise.all([
+        supabase
+          .from("roles")
+          .select("key, label")
+          .eq("id", membershipRow.role_id)
+          .maybeSingle(),
+        supabase
+          .from("organizations")
+          .select(
+            "id, slug, name, default_currency_code, default_locale, approval_threshold_bps, timezone",
+          )
+          .eq("id", membershipRow.organization_id)
+          .maybeSingle(),
+        supabase
+          .from("role_capabilities")
+          .select("capability_key")
+          .eq("role_id", membershipRow.role_id),
+      ]);
+
+    if (
+      roleResult.error ||
+      organizationResult.error ||
+      capabilityResult.error ||
+      !roleResult.data ||
+      !organizationResult.data
+    ) {
+      console.error("auth_context_relationship_query_failed", {
+        roleCode: roleResult.error?.code,
+        organizationCode: organizationResult.error?.code,
+        capabilityCode: capabilityResult.error?.code,
+        roleFound: Boolean(roleResult.data),
+        organizationFound: Boolean(organizationResult.data),
+      });
+      throw new Error("Unable to load the authenticated organization context.");
+    }
+
+    membership = {
+      organizationId: membershipRow.organization_id,
+      status: membershipRow.status,
+      createdAt: membershipRow.created_at,
+      role: roleResult.data,
+      organization: organizationResult.data,
+    };
+    capabilities = capabilityResult.data.map((row) => row.capability_key);
   }
 
   return {

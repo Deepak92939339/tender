@@ -25,16 +25,35 @@ test("public reviewer enters in one click and sees only read controls", async ({
 
   await page.getByRole("link", { name: "Help" }).click();
   await expect(
-    page.getByRole("heading", { name: "How to review Tender" }),
+    page.getByRole("heading", {
+      name: "Understand Tender without guessing.",
+    }),
   ).toBeVisible();
   await expect(
-    page.getByText("Read-only account", { exact: true }),
+    page.getByRole("heading", { name: "Quick start" }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 
-  await page
-    .getByRole("navigation", { name: "Application" })
-    .getByRole("link", { name: "Approvals" })
-    .click();
+  await page.goto("/quotes");
+  await page.getByRole("link", { name: "What's new" }).click();
+  await expect(
+    page.getByRole("heading", { name: "What's new in Tender" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+
+  await page.goto("/approvals");
   await expect(page.getByText(/cannot approve or reject/i)).toBeVisible();
 
   expect(

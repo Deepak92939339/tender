@@ -1,18 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { SampleQuoteBuilder } from "@/components/demo/sample-quote-builder";
-import { Brand } from "@/components/ui/brand";
+import { PublicHeader } from "@/components/marketing/public-header";
 
 export default function LandingPage() {
   return (
     <main id="main-content" className="public-shell tender-public">
-      <header className="public-header">
-        <Brand />
-        <nav aria-label="Public navigation">
-          <a href="#sample-builder">Try the specimen</a>
-          <Link href="/sign-in">Reviewer access</Link>
-        </nav>
-      </header>
+      <PublicHeader />
       <section className="public-introduction" id="product">
         <div className="public-introduction-copy">
           <p className="eyebrow">

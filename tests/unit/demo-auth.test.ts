@@ -21,7 +21,6 @@ describe("public demo authentication policy", () => {
       "/approvals/queue",
       "/catalog",
       "/customers/123",
-      "/help",
       "/onboarding",
       "/settings",
       "/settings/organization",
@@ -29,6 +28,8 @@ describe("public demo authentication policy", () => {
       expect(isProtectedPath(path), path).toBe(true);
     }
     expect(isProtectedPath("/sign-in")).toBe(false);
+    expect(isProtectedPath("/help")).toBe(false);
+    expect(isProtectedPath("/whats-new")).toBe(false);
     expect(isProtectedPath("/settings-public")).toBe(false);
   });
 });
