@@ -2111,6 +2111,53 @@ textarea {
   font-size: 12px;
   font-weight: 400;
 }
+.reviewer-access {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: var(--radius-control);
+  background: var(--surface-cool);
+}
+.reviewer-access .eyebrow,
+.reviewer-access h2,
+.reviewer-access p,
+.reviewer-access dl,
+.reviewer-access dd {
+  margin: 0;
+}
+.reviewer-access h2 {
+  font-size: 18px;
+}
+.reviewer-access p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.reviewer-access dl {
+  display: grid;
+  gap: 8px;
+}
+.reviewer-access dl > div {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 10px;
+}
+.reviewer-access dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.reviewer-access dd {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.auth-card form .reviewer-button {
+  margin: 0;
+  border-color: var(--accent-dark);
+  color: var(--accent-dark);
+}
 .auth-switch {
   margin: 24px 0 0;
   color: var(--muted);
@@ -2327,6 +2374,51 @@ textarea {
   overflow-x: clip;
   margin: 0 auto;
   padding: 48px clamp(20px, 4vw, 64px) 80px;
+}
+.access-badge {
+  align-self: center;
+  padding: 7px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 750;
+}
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.help-grid article {
+  min-width: 0;
+  padding: 28px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.help-grid article > span {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 750;
+}
+.help-grid h2 {
+  margin: 12px 0 8px;
+  font-size: 22px;
+}
+.help-grid h2 a {
+  color: inherit;
+}
+.help-grid p {
+  margin: 0;
+  color: var(--muted);
+}
+.help-explanation {
+  max-width: 840px;
+  margin-top: 42px;
+}
+.help-explanation li + li {
+  margin-top: 10px;
 }
 .page-scaffold > header {
   display: flex;
@@ -3521,6 +3613,9 @@ td.money {
   }
   .app-main {
     padding: 34px 16px 64px;
+  }
+  .help-grid {
+    grid-template-columns: 1fr;
   }
   .page-scaffold > header {
     align-items: stretch;

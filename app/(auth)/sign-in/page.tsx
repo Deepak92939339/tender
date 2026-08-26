@@ -10,11 +10,13 @@ export default async function SignInPage({
   searchParams: Promise<{ returnTo?: string }>;
 }) {
   const query = await searchParams;
+  const publicDemo = isPublicDemoMode();
   return (
     <AuthCard
       mode="sign-in"
       returnTo={safeReturnTo(query.returnTo)}
-      signUpEnabled={!isPublicDemoMode()}
+      signUpEnabled={!publicDemo}
+      showReviewerAccess={publicDemo}
     />
   );
 }

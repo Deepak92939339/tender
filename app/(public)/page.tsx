@@ -10,7 +10,7 @@ export default function LandingPage() {
         <Brand />
         <nav aria-label="Public navigation">
           <a href="#sample-builder">Try the specimen</a>
-          <Link href="/sign-in">Sign in</Link>
+          <Link href="/sign-in">Reviewer access</Link>
         </nav>
       </header>
       <section className="public-introduction" id="product">
@@ -28,7 +28,7 @@ export default function LandingPage() {
               Try it — no account
             </a>
             <Link className="button" href="/sign-in">
-              Sign in
+              Open reviewer demo
             </Link>
           </div>
         </div>
@@ -87,8 +87,8 @@ export default function LandingPage() {
           </li>
         </ol>
         <p>
-          <Link href="/sign-in">Sign in</Link> to create, store, approve and
-          issue quotations in your workspace.
+          <Link href="/sign-in">Open the read-only reviewer workspace</Link> to
+          inspect stored quotations, customers, catalog and approvals.
         </p>
       </section>
     </main>

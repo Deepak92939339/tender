@@ -3,6 +3,7 @@ export const protectedPaths = [
   "/approvals",
   "/catalog",
   "/customers",
+  "/help",
   "/onboarding",
   "/settings",
 ] as const;

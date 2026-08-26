@@ -1,6 +1,7 @@
 -- Synthetic local-only identities. Operator, manager and outsider use the
--- local test password referenced by the automated tests. The organization
--- admin has no published reusable password.
+-- local test password referenced by the automated tests. The reviewer uses
+-- the public portfolio credential. The organization admin has no published
+-- reusable password.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   confirmation_token, recovery_token, email_change_token_new, email_change,
@@ -9,7 +10,8 @@ insert into auth.users (
   ('00000000-0000-0000-0000-000000000000', '11111111-1111-4111-8111-111111111111', 'authenticated', 'authenticated', 'operator@tender.local', crypt('TenderLocal1!', gen_salt('bf')), now(), '', '', '', '', '{"provider":"email","providers":["email"]}', '{"display_name":"Aarav Operator"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '22222222-2222-4222-8222-222222222222', 'authenticated', 'authenticated', 'manager@tender.local', crypt('TenderLocal1!', gen_salt('bf')), now(), '', '', '', '', '{"provider":"email","providers":["email"]}', '{"display_name":"Mira Manager"}', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '33333333-3333-4333-8333-333333333333', 'authenticated', 'authenticated', 'admin@tender.local', crypt(gen_random_uuid()::text, gen_salt('bf')), now(), '', '', '', '', '{"provider":"email","providers":["email"]}', '{"display_name":"Anika Admin"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-8444-444444444444', 'authenticated', 'authenticated', 'outsider@tender.local', crypt('TenderLocal1!', gen_salt('bf')), now(), '', '', '', '', '{"provider":"email","providers":["email"]}', '{"display_name":"Omar Outsider"}', now(), now())
+  ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-8444-444444444444', 'authenticated', 'authenticated', 'outsider@tender.local', crypt('TenderLocal1!', gen_salt('bf')), now(), '', '', '', '', '{"provider":"email","providers":["email"]}', '{"display_name":"Omar Outsider"}', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '55555555-5555-4555-8555-555555555555', 'authenticated', 'authenticated', 'demo.reviewer@tender.example.test', crypt('TenderReview2026!', gen_salt('bf')), now(), '', '', '', '', '{"provider":"email","providers":["email"]}', '{"display_name":"Rhea Reviewer"}', now(), now())
 on conflict (id) do nothing;
 
 -- Supabase password sign-in requires an email identity as well as an auth user.
@@ -36,7 +38,8 @@ where seeded_user.id in (
   '11111111-1111-4111-8111-111111111111',
   '22222222-2222-4222-8222-222222222222',
   '33333333-3333-4333-8333-333333333333',
-  '44444444-4444-4444-8444-444444444444'
+  '44444444-4444-4444-8444-444444444444',
+  '55555555-5555-4555-8555-555555555555'
 )
 on conflict (provider_id, provider) do nothing;
 
@@ -89,7 +92,8 @@ from (values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid, '11111111-1111-4111-8111-111111111111'::uuid, 'operator'),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid, '22222222-2222-4222-8222-222222222222'::uuid, 'manager'),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid, '33333333-3333-4333-8333-333333333333'::uuid, 'organization_admin'),
-  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid, '44444444-4444-4444-8444-444444444444'::uuid, 'organization_admin')
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid, '44444444-4444-4444-8444-444444444444'::uuid, 'organization_admin'),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid, '55555555-5555-4555-8555-555555555555'::uuid, 'reviewer')
 ) membership(organization_id, user_id, role_key)
 join public.roles role on role.key = membership.role_key
 on conflict (organization_id, user_id) do nothing;

@@ -28,6 +28,7 @@ export function AppShell({
             <small>{context.roleLabel}</small>
           </span>
           <div className="account-actions">
+            <Link href="/help">Help</Link>
             {context.canManageOrganization && (
               <Link href="/settings/organization">Organization settings</Link>
             )}

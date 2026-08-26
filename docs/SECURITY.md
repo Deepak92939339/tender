@@ -12,7 +12,7 @@ The guarded cloud demo command accepts a database URL only from the invoking ope
 
 ## Public demo access
 
-For a public deployment, set `TENDER_DEMO_MODE=true` and disable email signup in hosted Supabase Auth. The application then removes signup entry points, redirects the signup page, and rejects the signup Server Action before it calls Auth. Demo credentials are created and distributed privately; no hosted credential belongs in this repository. The seeded demo user ends with the `manager` role, not organization admin.
+For a public deployment, set `TENDER_DEMO_MODE=true` and disable email signup in hosted Supabase Auth. The application removes signup entry points, redirects the signup page, and rejects the signup Server Action before it calls Auth. The published reviewer credential is deliberately non-secret and must have only `organization.read`, `catalog.read`, `customer.read`, and `quote.read`. RLS and guarded RPC capability checks—not secrecy of the password or hidden buttons—enforce the read-only boundary. The privately held seed identity remains a non-admin `manager` and is not published.
 
 ## Reporting
 

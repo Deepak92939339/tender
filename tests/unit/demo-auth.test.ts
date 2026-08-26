@@ -21,6 +21,7 @@ describe("public demo authentication policy", () => {
       "/approvals/queue",
       "/catalog",
       "/customers/123",
+      "/help",
       "/onboarding",
       "/settings",
       "/settings/organization",

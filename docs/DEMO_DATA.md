@@ -16,7 +16,9 @@ The wrapper `scripts/seed-cloud-demo.mjs`:
 - takes the database password only from `SUPABASE_DB_URL` in the operator environment;
 - uses one transaction and performs no delete, truncate, or reset;
 - makes no changes when its unique demo organization slug already exists;
-- ends by assigning the demo user the `manager` role.
+- ends by assigning the privately held seed user the `manager` role.
+
+The separate guarded migration `20260826091000_public_demo_reviewer_identity.sql` runs only when the unique fictional organization slug already exists. It provisions the published reviewer credential and assigns the four-capability `reviewer` role. It does not make the manager credential public and does not enable signup.
 
 The committed allowlist contains only the dedicated disposable portfolio-demo project reference. Preview and apply refuse any other project; rotate that entry deliberately if the demo project is recreated.
 

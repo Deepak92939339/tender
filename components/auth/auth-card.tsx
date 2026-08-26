@@ -6,10 +6,12 @@ export function AuthCard({
   mode,
   returnTo,
   signUpEnabled,
+  showReviewerAccess = false,
 }: {
   mode: "sign-in" | "create-account";
   returnTo?: string;
   signUpEnabled: boolean;
+  showReviewerAccess?: boolean;
 }) {
   const creating = mode === "create-account";
   return (
@@ -29,7 +31,11 @@ export function AuthCard({
               : "Continue to your commercial workspace."}
           </p>
         </div>
-        <AuthForm mode={mode} returnTo={returnTo} />
+        <AuthForm
+          mode={mode}
+          returnTo={returnTo}
+          showReviewerAccess={showReviewerAccess}
+        />
         {creating || signUpEnabled ? (
           <p className="auth-switch">
             {creating ? "Already have an account?" : "New to Tender?"}{" "}
@@ -39,8 +45,9 @@ export function AuthCard({
           </p>
         ) : (
           <p className="auth-switch">
-            This public demo is invitation-only. Demo access is supplied
-            privately by the project owner.
+            Need orientation? Use the reviewer account above. Public account
+            creation is disabled so the seeded portfolio workspace stays
+            controlled.
           </p>
         )}
       </section>

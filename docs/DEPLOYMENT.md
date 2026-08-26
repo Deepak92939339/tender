@@ -17,9 +17,11 @@ Review the dry-run migration list before applying it. `supabase/seed.sql` is for
 
 In Supabase Auth URL Configuration, set Site URL to the final HTTPS Vercel production URL. Add only the exact production callback/base URL actually needed; add explicit preview URLs only if preview authentication is intentionally supported. Disable email signup for the public demo, keep anonymous sign-in disabled, and disable unused providers.
 
-## 2. Demo identity and data
+## 2. Demo identities and data
 
-Create one dedicated Auth user with a strong unique password stored outside source. Copy only its UUID into the invoking shell. Replace the placeholder in `supabase/demo/project-allowlist.json` with the real project reference and follow [Demo data](DEMO_DATA.md). Do not use a personal account.
+Create one dedicated manager Auth user with a strong unique password stored outside source. Copy only its UUID into the invoking shell. Replace the placeholder in `supabase/demo/project-allowlist.json` with the real project reference and follow [Demo data](DEMO_DATA.md). Do not use a personal account.
+
+After the fictional organization exists, apply `20260826091000_public_demo_reviewer_identity.sql`. Its organization-slug guard makes it inert on ordinary installations; in the dedicated portfolio demo it provisions the published reviewer identity and attaches the `reviewer` role. Never assign the published password to the manager, organization administrator, or any non-fictional environment.
 
 ## 3. Vercel application
 
@@ -63,7 +65,7 @@ Before deployment, run `npm ci`, `npm run verify`, and a production build with t
 1. Confirm the landing page and sign-in page load over HTTPS.
 2. Confirm signup calls to action are absent and `/create-account` redirects to sign-in.
 3. Confirm unauthenticated `/quotes` and `/settings/organization` requests redirect with a safe local return target.
-4. Sign in with the privately held demo credential and inspect quotes, customers, catalog, approvals, and settings denial for the manager role.
+4. Use **Enter reviewer workspace** and confirm Quotes, Customers, Catalog, Approvals, and Help load while create/edit/approve/reject/issue controls remain absent.
 5. Open an issued quote and verify the issued-only print view and captured seller/customer snapshots.
 6. Open a newly created public capability link. Confirm its fragment is removed, the recipient document matches the issued snapshot, and no secret reaches the query string or browser storage.
 7. Confirm the exact database-projected acceptance statement appears before acceptance, record one acceptance, and replay its idempotency key without creating duplicate evidence.

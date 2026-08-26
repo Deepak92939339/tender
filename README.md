@@ -52,10 +52,11 @@ npm run verify
 The complete local gate resets the disposable database, applies migrations and the local seed, runs pgTAP, regenerates database types, runs lint, typecheck, unit and parity checks, concurrency runners, a production build, bounded Playwright shards, and tracked/client-asset secret scans. The final Stage 3 public-candidate evidence recorded:
 
 - Unit: **156/156 passed across 22 files**
-- pgTAP: **23 files, 642 assertions passed**
+- pgTAP: **24 files, 652 assertions passed**
 - Calculator parity: **5,000/5,000 deterministic cases matched exactly**
 - Concurrency: **40/40 unique quote numbers; one-winner approval decision; commitment races passed**
 - Playwright: **all 96 desktop/mobile assignments covered sequentially; 87 passed and 9 intentional project skips**
+- Reviewer access: **one-click desktop/mobile entry passed with database-enforced read-only controls**
 - Production build: **passed with 13 App Router pages; formatting, ESLint, and TypeScript passed**
 - Security and UX: **signed transport, secret scans, clean-demo isolation, and authenticated responsive audit passed**
 
@@ -68,9 +69,11 @@ Normal local behavior keeps self-service signup enabled. Set the server-only var
 - removes signup calls to action;
 - redirects `/create-account` to sign-in;
 - rejects the signup Server Action before calling Supabase Auth;
-- keeps sign-in available for an invitation-only demo account.
+- publishes a dedicated reviewer email and password on the sign-in page;
+- provides one-click entry to the seeded workspace;
+- assigns that identity only `organization.read`, `catalog.read`, `customer.read`, and `quote.read`.
 
-Hosted Supabase email signup must also be disabled in Auth settings. Create a dedicated demo user with a strong unique password outside the repository, seed the fictional dataset using that user's UUID, and share access privately. The cloud seed downgrades the account to the non-admin `manager` role after provisioning. No hosted password belongs in source, documentation, Vercel, or deployment logs.
+Hosted Supabase email signup remains disabled. The privately held manager identity owns the fictional seed, while the published `demo.reviewer@tender.example.test` identity is deliberately non-secret and read-only. Mutation controls are hidden in the application and denied independently by capability checks, guarded RPCs, and RLS. Do not reuse the published credential for any privileged identity or non-fictional environment.
 
 The cloud demo dataset is separate from the local test seed and never runs during migration deployment. Its allowlist is pinned to the dedicated disposable portfolio-demo project, while application remains a deliberate, guarded, idempotent operator action. See [Demo data](docs/DEMO_DATA.md).
 
@@ -80,7 +83,7 @@ The intended deployment is Vercel for Next.js plus one dedicated Supabase projec
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `TENDER_DEMO_MODE=true` for the public invitation-only demo
+- `TENDER_DEMO_MODE=true` for the public read-only reviewer demo
 - `TENDER_EDGE_BROKER_TRANSPORT_SECRET` for the server-to-server public broker envelope
 - `TENDER_PUBLIC_SESSION_ENCRYPTION_KEY` for the short-lived encrypted recipient session
 
@@ -97,7 +100,7 @@ The transport and session secrets are server-only Next.js runtime values; `TENDE
 - Command receipts retain command payload/result evidence until an operator adopts and documents a retention policy.
 - `tax_profiles.price_basis` remains a deprecated compatibility field; quote calculations use the saved quote tax mode and line snapshots.
 - Some command functions intentionally lock their aggregate before later authorization/state guards, so rejected contenders can briefly wait rather than bypass serialization.
-- Cloud deployment and independent penetration testing have not yet occurred.
+- The portfolio demo is deployed; independent penetration testing has not occurred.
 
 ## Repository map
 
